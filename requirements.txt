@@ -1,0 +1,15 @@
+# Framework
+Django>=5.0,<5.2
+
+# Configuración por variables de entorno
+python-decouple>=3.8
+dj-database-url>=2.1
+
+# UI / Frontend integration
+django-bootstrap5>=24.2
+
+# Manejo de imágenes (ImageField)
+Pillow>=10.0
+
+# Driver PostgreSQL (descomentar al desplegar a producción)
+# psycopg2-binary>=2.9
