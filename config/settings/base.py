@@ -107,6 +107,13 @@ AUTH_PASSWORD_VALIDATORS = [
 # Usuario personalizado
 # ---------------------------------------------------------------------------
 AUTH_USER_MODEL = 'usuarios.Usuario'
+AUTH_USER_MODEL = 'usuarios.Usuario'
+
+# Backend de autenticación custom que permite login con DUI o Email
+AUTHENTICATION_BACKENDS = [
+    'apps.usuarios.backends.DUIorEmailBackend',  # Nuestro backend (DUI o email)
+    'django.contrib.auth.backends.ModelBackend',  # Backend por defecto (fallback)
+]
 
 
 # ---------------------------------------------------------------------------
