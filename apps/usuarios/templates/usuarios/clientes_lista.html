@@ -1,4 +1,3 @@
-{# Lista de clientes con buscador (admin). Lo arma la vista clientes_lista. #}
 {% extends 'core/base.html' %}
 
 {% block title %}Clientes · Taller{% endblock %}
@@ -9,8 +8,6 @@
     <span class="text-muted small">Total: {{ total }}</span>
 </div>
 
-{# Form de búsqueda. method="get" hace que el filtro quede en la URL (?q=...)
-   así el usuario puede copiar el link y volver al mismo resultado. #}
 <form method="get" class="row g-2 mb-4">
     <div class="col-md-8">
         <input type="text" name="q" value="{{ q }}"
@@ -20,7 +17,6 @@
     <div class="col-md-2">
         <button type="submit" class="btn btn-dark w-100">Buscar</button>
     </div>
-    {# Solo muestro "Limpiar" si hay una búsqueda activa. #}
     {% if q %}
     <div class="col-md-2">
         <a href="{% url 'usuarios:clientes_lista' %}" class="btn btn-outline-secondary w-100">Limpiar</a>
@@ -28,7 +24,6 @@
     {% endif %}
 </form>
 
-{# Si hay clientes, dibujo la tabla. Si no, muestro un mensaje vacío. #}
 {% if clientes %}
 <div class="table-responsive">
     <table class="table table-hover align-middle">
@@ -43,7 +38,6 @@
             </tr>
         </thead>
         <tbody>
-            {# Recorro la lista de clientes que vino desde la vista. #}
             {% for cliente in clientes %}
             <tr>
                 <td>{{ cliente.dui }}</td>
@@ -51,7 +45,6 @@
                 <td>{{ cliente.email }}</td>
                 <td>{{ cliente.telefono }}</td>
                 <td>
-                    {# Badge verde si está activo, gris si no. #}
                     {% if cliente.activo %}
                         <span class="badge bg-success">Activo</span>
                     {% else %}
@@ -59,8 +52,6 @@
                     {% endif %}
                 </td>
                 <td class="text-end">
-                    {# {% url 'usuarios:cliente_detalle' dui=cliente.dui %} arma la URL
-                       del detalle pasando el DUI como argumento. #}
                     <a href="{% url 'usuarios:cliente_detalle' dui=cliente.dui %}"
                        class="btn btn-sm btn-outline-dark">Ver</a>
                 </td>
