@@ -1,5 +1,3 @@
-{# Form para editar los datos de un cliente. La vista cliente_editar
-   maneja tanto el GET (mostrar form) como el POST (procesarlo). #}
 {% extends 'core/base.html' %}
 
 {% block title %}Editar {{ cliente.nombre_completo }} · Taller{% endblock %}
@@ -11,15 +9,9 @@
 
 <h1 class="h3 mb-4">Editar cliente</h1>
 
-{# novalidate evita que el navegador haga su propia validación HTML5;
-   prefiero que sea Django el que decida qué es válido. #}
 <form method="post" novalidate>
-    {# csrf_token es un token oculto que Django exige en TODOS los POST
-       para protegernos de ataques CSRF. Si lo sacás, el server tira 403. #}
     {% csrf_token %}
 
-    {# El DUI no es editable: es la PK del usuario.
-       Lo muestro deshabilitado para que el admin vea cuál cliente está editando. #}
     <div class="row mb-3">
         <label class="col-sm-3 col-form-label">DUI</label>
         <div class="col-sm-9">
@@ -28,10 +20,6 @@
         </div>
     </div>
 
-    {# Patrón que se repite para cada campo:
-       - value="{{ datos.X }}" muestra lo que llegó del POST (o lo precargado).
-       - Si hay error en ese campo, le pongo la clase is-invalid de Bootstrap
-         y muestro el mensaje debajo con .invalid-feedback. #}
     <div class="row mb-3">
         <label for="nombre" class="col-sm-3 col-form-label">Nombre</label>
         <div class="col-sm-9">
