@@ -1,0 +1,16 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Mis motos · Taller{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Mis motocicletas</h1>
+    <a href="{% url 'vehiculos:motos_form' %}" class="btn btn-dark">+ Registrar moto</a>
+</div>
+
+<div class="card">
+    <div class="card-body text-center text-muted py-5">
+        <p class="mb-0">En construcción</p>
+    </div>
+</div>
+{% endblock %}
