@@ -1,0 +1,68 @@
+{# Detalle de un cliente: muestra todos sus datos y botones para
+   editar o activar/desactivar. #}
+{% extends 'core/base.html' %}
+
+{% block title %}Cliente {{ cliente.nombre_completo }} · Taller{% endblock %}
+
+{% block content %}
+<p class="mb-2">
+    <a href="{% url 'usuarios:clientes_lista' %}" class="text-decoration-none">&larr; Volver a clientes</a>
+</p>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">{{ cliente.nombre_completo }}</h1>
+        {% if cliente.activo %}
+            <span class="badge bg-success">Activo</span>
+        {% else %}
+            <span class="badge bg-secondary">Inactivo</span>
+        {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'usuarios:cliente_editar' dui=cliente.dui %}" class="btn btn-dark">Editar</a>
+        {# Uso un <form> con POST en vez de un <a> porque toggle modifica datos.
+           Solo POST acepta la vista cliente_toggle, así nadie puede desactivar
+           un cliente por accidente abriendo un link. #}
+        <form method="post" action="{% url 'usuarios:cliente_toggle' dui=cliente.dui %}" class="d-inline">
+            {% csrf_token %}
+            {% if cliente.activo %}
+                <button type="submit" class="btn btn-outline-danger"
+                        onclick="return confirm('¿Desactivar a este cliente?');">
+                    Desactivar
+                </button>
+            {% else %}
+                <button type="submit" class="btn btn-outline-success">
+                    Activar
+                </button>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">DUI</dt>
+            <dd class="col-sm-9">{{ cliente.dui }}</dd>
+
+            <dt class="col-sm-3">Nombre</dt>
+            <dd class="col-sm-9">{{ cliente.nombre }}</dd>
+
+            <dt class="col-sm-3">Apellido</dt>
+            <dd class="col-sm-9">{{ cliente.apellido }}</dd>
+
+            <dt class="col-sm-3">Teléfono</dt>
+            <dd class="col-sm-9">{{ cliente.telefono }}</dd>
+
+            <dt class="col-sm-3">Correo</dt>
+            <dd class="col-sm-9">{{ cliente.email }}</dd>
+
+            <dt class="col-sm-3">Dirección</dt>
+            <dd class="col-sm-9">{{ cliente.direccion }}</dd>
+
+            <dt class="col-sm-3">Registrado el</dt>
+            <dd class="col-sm-9">{{ cliente.fecha_registro|date:"d/m/Y H:i" }}</dd>
+        </dl>
+    </div>
+</div>
+{% endblock %}

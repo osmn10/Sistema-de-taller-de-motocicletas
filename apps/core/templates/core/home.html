@@ -1,0 +1,17 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Inicio · Taller de Motos{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-5 fw-light">Sistema de Taller de Motocicletas</h1>
+    <p class="lead text-muted">Agendá citas, registrá tus motos y llevá el historial de servicios.</p>
+
+    {% if not user.is_authenticated %}
+        <div class="mt-4">
+            <a href="{% url 'usuarios:login' %}" class="btn btn-dark me-2">Iniciar sesión</a>
+            <a href="{% url 'usuarios:registro_cliente' %}" class="btn btn-outline-dark">Crear cuenta</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

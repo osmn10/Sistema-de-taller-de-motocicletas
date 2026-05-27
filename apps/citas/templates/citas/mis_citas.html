@@ -1,0 +1,16 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Mis citas · Taller{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Mis citas</h1>
+    <a href="{% url 'citas:agendar_cita' %}" class="btn btn-dark">+ Agendar nueva cita</a>
+</div>
+
+<div class="card">
+    <div class="card-body text-center text-muted py-5">
+        <p class="mb-0">En construcción</p>
+    </div>
+</div>
+{% endblock %}

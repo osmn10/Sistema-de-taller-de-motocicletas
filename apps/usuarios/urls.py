@@ -1,40 +1,32 @@
-
 """URLs de la app usuarios."""
 
 from django.urls import path
 
 from . import views
-
-app_name = 'usuarios'
-
-urlpatterns = [
-    path('registro/', views.registro_cliente, name='registro_cliente'),
-]
-=======
-# Importar la función path para definir rutas URL
-from django.urls import path
-
-# Importar las vistas que creamos en views.py
 from .views import LoginView, LogoutView
 
-# app_name define el namespace (espacio de nombres) de esta app
-# Permite usar {% url 'usuarios:login' %} en los templates
+# app_name hace que estas URLs vivan en el namespace "usuarios".
+# Eso permite escribir {% url 'usuarios:login' %} en los templates
+# sin que choque con un 'login' de otra app.
 app_name = 'usuarios'
 
-# urlpatterns es la lista de URLs que maneja esta app
 urlpatterns = [
-    # Ruta para el login
-    # URL: /usuarios/login/
-    # Vista: LoginView (maneja GET y POST)
-    # name: identificador para usar en templates y redirects
+    # --- Autenticación ---
     path('login/', LoginView.as_view(), name='login'),
-    
-    # Ruta para el logout (cerrar sesión)
-    # URL: /usuarios/logout/
-    # Vista: LogoutView
     path('logout/', LogoutView.as_view(), name='logout'),
-    
-    # NOTA: Estas rutas las crearás después cuando hagas el registro
-    # path('registro/', RegistroView.as_view(), name='registro'),
-    # path('recuperar-password/', RecuperarPasswordView.as_view(), name='recuperar_password'),
+    path('registro/', views.registro_cliente, name='registro_cliente'),
+
+    # Perfil del usuario logueado (placeholder, lo implementa SCRUM-43)
+    path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
+
+    # --- CRUD de clientes (SCRUM-29, solo admin) ---
+    # El <str:dui> captura el DUI desde la URL y lo pasa como argumento
+    # a la vista. Como nuestro DUI es del estilo "00000000-0", uso str.
+    path('clientes/', views.clientes_lista, name='clientes_lista'),
+    path('clientes/<str:dui>/', views.cliente_detalle, name='cliente_detalle'),
+    path('clientes/<str:dui>/editar/', views.cliente_editar, name='cliente_editar'),
+    path('clientes/<str:dui>/toggle/', views.cliente_toggle, name='cliente_toggle'),
+
+    # Gestión de mecánicos y admins (placeholder, otro PBI)
+    path('usuarios/', views.usuarios_lista, name='usuarios_lista'),
 ]

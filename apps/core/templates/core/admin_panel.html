@@ -1,0 +1,58 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Panel del administrador · Taller{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Panel del administrador</h1>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <a href="{% url 'citas:calendario' %}" class="card text-decoration-none text-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Citas</h5>
+                <p class="card-text text-muted small">Calendario y gestión de todas las citas.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{% url 'usuarios:clientes_lista' %}" class="card text-decoration-none text-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Clientes</h5>
+                <p class="card-text text-muted small">Listado y gestión de clientes registrados.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{% url 'servicios:catalogo' %}" class="card text-decoration-none text-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Servicios</h5>
+                <p class="card-text text-muted small">Catálogo de servicios del taller.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{% url 'productos:inventario' %}" class="card text-decoration-none text-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Productos</h5>
+                <p class="card-text text-muted small">Inventario de repuestos e insumos.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{% url 'usuarios:usuarios_lista' %}" class="card text-decoration-none text-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Usuarios</h5>
+                <p class="card-text text-muted small">Mecánicos y administradores del sistema.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{% url 'configuracion:horario' %}" class="card text-decoration-none text-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Horario</h5>
+                <p class="card-text text-muted small">Configuración del horario de atención.</p>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}
