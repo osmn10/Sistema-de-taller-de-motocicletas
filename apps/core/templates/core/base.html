@@ -11,11 +11,96 @@
 
     {% block extra_css %}{% endblock %}
 </head>
-<body class="d-flex flex-column min-vh-100">
+<body class="d-flex flex-column min-vh-100 bg-light">
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/">Taller de Motos</a>
+
+            {% if user.is_authenticated and user.is_admin %}
+                <a class="navbar-brand" href="{% url 'core:admin_panel' %}">Taller · Admin</a>
+            {% elif user.is_authenticated and user.is_mecanico %}
+                <a class="navbar-brand" href="{% url 'core:panel_mecanico' %}">Taller · Mecánico</a>
+            {% else %}
+                <a class="navbar-brand" href="{% url 'core:home' %}">Taller de Motos</a>
+            {% endif %}
+
+            <button class="navbar-toggler" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#mainNav"
+                    aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menú">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
+                    {% if user.is_authenticated and user.is_cliente %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'citas:mis_citas' %}">Mis citas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'vehiculos:mis_motos' %}">Mis motos</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'usuarios:mi_perfil' %}">Perfil</a>
+                        </li>
+
+                    {% elif user.is_authenticated and user.is_admin %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'citas:calendario' %}">Citas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'usuarios:clientes_lista' %}">Clientes</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'servicios:catalogo' %}">Servicios</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'productos:inventario' %}">Productos</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'usuarios:usuarios_lista' %}">Usuarios</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'configuracion:horario' %}">Horario</a>
+                        </li>
+
+                    {% elif user.is_authenticated and user.is_mecanico %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'citas:mis_citas_mecanico' %}">Mis citas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'usuarios:mi_perfil' %}">Perfil</a>
+                        </li>
+                    {% endif %}
+                </ul>
+
+                <ul class="navbar-nav ms-auto">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button"
+                               data-bs-toggle="dropdown" aria-expanded="false">
+                                {{ user.nombre }} {{ user.apellido }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'usuarios:mi_perfil' %}">Mi perfil</a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'usuarios:logout' %}">Cerrar sesión</a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'usuarios:login' %}">Iniciar sesión</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'usuarios:registro_cliente' %}">Registrarse</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
     </nav>
 
@@ -32,11 +117,22 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="bg-light text-center py-3 mt-auto">
-        <small class="text-muted">&copy; Taller de Motos — Proyecto DSI</small>
+    <footer class="bg-dark text-light text-center py-3 mt-auto">
+        <small>&copy; Taller de Motos — Proyecto DSI · UES · Grupo 1</small>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/masks.js' %}"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(function () {
+                document.querySelectorAll('.alert').forEach(function (alert) {
+                    bootstrap.Alert.getOrCreateInstance(alert).close();
+                });
+            }, 5000);
+        });
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

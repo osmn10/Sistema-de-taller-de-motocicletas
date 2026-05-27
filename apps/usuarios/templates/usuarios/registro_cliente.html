@@ -1,0 +1,150 @@
+{% extends "core/base.html" %}
+
+{% block title %}Registro de cliente — Taller de Motos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-control { border-style: dashed; }
+    .form-control.is-invalid { border-style: dashed; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+
+        <p class="text-muted small mb-1">02 · REGISTRO DE CLIENTE</p>
+        <h2 class="mb-4">Crear cuenta</h2>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% comment %} DUI {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="dui" class="col-sm-3 col-form-label">DUI</label>
+                <div class="col-sm-9">
+                    <input type="text" id="dui" name="dui"
+                           class="form-control {% if errores.dui %}is-invalid{% endif %}"
+                           placeholder="00000000-0"
+                           value="{{ datos.dui }}"
+                           maxlength="10"
+                           data-mask="dui"
+                           inputmode="numeric">
+                    {% if errores.dui %}
+                        <div class="invalid-feedback">{{ errores.dui }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% comment %} Nombre {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="nombre" class="col-sm-3 col-form-label">Nombre</label>
+                <div class="col-sm-9">
+                    <input type="text" id="nombre" name="nombre"
+                           class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+                           placeholder="Nombre"
+                           value="{{ datos.nombre }}">
+                    {% if errores.nombre %}
+                        <div class="invalid-feedback">{{ errores.nombre }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% comment %} Apellido {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="apellido" class="col-sm-3 col-form-label">Apellido</label>
+                <div class="col-sm-9">
+                    <input type="text" id="apellido" name="apellido"
+                           class="form-control {% if errores.apellido %}is-invalid{% endif %}"
+                           placeholder="Apellido"
+                           value="{{ datos.apellido }}">
+                    {% if errores.apellido %}
+                        <div class="invalid-feedback">{{ errores.apellido }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% comment %} Teléfono {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="telefono" class="col-sm-3 col-form-label">Teléfono</label>
+                <div class="col-sm-9">
+                    <input type="text" id="telefono" name="telefono"
+                           class="form-control {% if errores.telefono %}is-invalid{% endif %}"
+                           placeholder="0000-0000"
+                           value="{{ datos.telefono }}"
+                           maxlength="9"
+                           data-mask="telefono"
+                           inputmode="numeric">
+                    {% if errores.telefono %}
+                        <div class="invalid-feedback">{{ errores.telefono }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% comment %} Correo {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="email" class="col-sm-3 col-form-label">Correo</label>
+                <div class="col-sm-9">
+                    <input type="email" id="email" name="email"
+                           class="form-control {% if errores.email %}is-invalid{% endif %}"
+                           placeholder="correo@ejemplo.com"
+                           value="{{ datos.email }}">
+                    {% if errores.email %}
+                        <div class="invalid-feedback">{{ errores.email }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% comment %} Dirección {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="direccion" class="col-sm-3 col-form-label">Dirección</label>
+                <div class="col-sm-9">
+                    <input type="text" id="direccion" name="direccion"
+                           class="form-control {% if errores.direccion %}is-invalid{% endif %}"
+                           placeholder="Calle, ciudad, departamento"
+                           value="{{ datos.direccion }}">
+                    {% if errores.direccion %}
+                        <div class="invalid-feedback">{{ errores.direccion }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% comment %} Contraseña {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="contrasena" class="col-sm-3 col-form-label">Contraseña</label>
+                <div class="col-sm-9">
+                    <input type="password" id="contrasena" name="contrasena"
+                           class="form-control {% if errores.contrasena %}is-invalid{% endif %}"
+                           placeholder="••••••••">
+                    {% if errores.contrasena %}
+                        <div class="invalid-feedback">{{ errores.contrasena }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% comment %} Confirmar {% endcomment %}
+            <div class="row mb-3 align-items-start">
+                <label for="confirmar" class="col-sm-3 col-form-label">Confirmar</label>
+                <div class="col-sm-9">
+                    <input type="password" id="confirmar" name="confirmar"
+                           class="form-control {% if errores.confirmar %}is-invalid{% endif %}"
+                           placeholder="••••••••">
+                    {% if errores.confirmar %}
+                        <div class="invalid-feedback">{{ errores.confirmar }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-dark">Crear cuenta</button>
+            </div>
+        </form>
+
+        <p class="mt-3">
+            <a href="{% url 'usuarios:login' %}">¿Ya tenés cuenta? Iniciar sesión</a>
+        </p>
+
+    </div>
+</div>
+{% endblock %}
