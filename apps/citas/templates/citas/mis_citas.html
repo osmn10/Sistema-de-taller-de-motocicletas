@@ -1,16 +1,41 @@
-{% extends 'core/base.html' %}
+﻿{% extends "core/base.html" %}
 
-{% block title %}Mis citas · Taller{% endblock %}
+{% block title %}Mis citas — Taller de Motos{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0">Mis citas</h1>
-    <a href="{% url 'citas:agendar_cita' %}" class="btn btn-dark">+ Agendar nueva cita</a>
-</div>
+<p class="text-muted small mb-1">MIS CITAS</p>
+<h2 class="mb-4">Mis citas</h2>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
-    </div>
-</div>
+{% if citas %}
+<table class="table">
+    <thead>
+        <tr>
+            <th class="text-muted fw-normal small">CITA</th>
+            <th class="text-muted fw-normal small">FECHA Y HORA</th>
+            <th class="text-muted fw-normal small">MOTOCICLETA</th>
+            <th class="text-muted fw-normal small">ESTADO</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cita in citas %}
+        <tr>
+            <td class="align-middle">#{{ cita.id }}</td>
+            <td class="align-middle">{{ cita.fecha }} · {{ cita.hora|time:"H:i" }}</td>
+            <td class="align-middle">{{ cita.motocicleta }}</td>
+            <td class="align-middle">
+                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">
+                    {{ cita.get_estado_display }}
+                </span>
+            </td>
+            <td class="align-middle text-end">
+                <a href="{% url 'citas:cita_detalle' cita.id %}" class="text-decoration-none">Ver detalle</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">No tenés citas programadas. <a href="#">Agendá una ahora</a>.</p>
+{% endif %}
 {% endblock %}
