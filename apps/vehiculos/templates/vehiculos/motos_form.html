@@ -1,0 +1,113 @@
+{% extends 'core/base.html' %}
+
+{% block title %}
+    {% if es_edicion %}Editar moto{% else %}Registrar moto{% endif %} · Taller
+{% endblock %}
+
+{% block content %}
+<p class="mb-2">
+    <a href="{% url 'vehiculos:mis_motos' %}" class="text-decoration-none">&larr; Volver a mis motos</a>
+</p>
+
+<h1 class="h3 mb-4">
+    {% if es_edicion %}Editar motocicleta{% else %}Registrar nueva motocicleta{% endif %}
+</h1>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="row mb-3">
+        <label for="placa" class="col-sm-3 col-form-label">Placa</label>
+        <div class="col-sm-9">
+            {% if es_edicion %}
+                <input type="text" class="form-control" value="{{ datos.placa }}" disabled>
+                <small class="text-muted">La placa no se puede modificar.</small>
+            {% else %}
+                <input type="text" id="placa" name="placa"
+                       class="form-control {% if errores.placa %}is-invalid{% endif %}"
+                       value="{{ datos.placa }}"
+                       placeholder="M-####"
+                       maxlength="6"
+                       data-mask="placa">
+                {% if errores.placa %}
+                    <div class="invalid-feedback">{{ errores.placa }}</div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="marca" class="col-sm-3 col-form-label">Marca</label>
+        <div class="col-sm-9">
+            <input type="text" id="marca" name="marca"
+                   class="form-control {% if errores.marca %}is-invalid{% endif %}"
+                   value="{{ datos.marca }}"
+                   placeholder="Yamaha, Honda, Suzuki...">
+            {% if errores.marca %}
+                <div class="invalid-feedback">{{ errores.marca }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="modelo" class="col-sm-3 col-form-label">Modelo</label>
+        <div class="col-sm-9">
+            <input type="text" id="modelo" name="modelo"
+                   class="form-control {% if errores.modelo %}is-invalid{% endif %}"
+                   value="{{ datos.modelo }}"
+                   placeholder="YBR 125, CG 150...">
+            {% if errores.modelo %}
+                <div class="invalid-feedback">{{ errores.modelo }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="anio" class="col-sm-3 col-form-label">Año</label>
+        <div class="col-sm-9">
+            <input type="number" id="anio" name="anio"
+                   class="form-control {% if errores.anio %}is-invalid{% endif %}"
+                   value="{{ datos.anio }}"
+                   min="1980" max="{{ anio_max }}"
+                   placeholder="2024">
+            {% if errores.anio %}
+                <div class="invalid-feedback">{{ errores.anio }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="color" class="col-sm-3 col-form-label">Color</label>
+        <div class="col-sm-9">
+            <input type="text" id="color" name="color"
+                   class="form-control {% if errores.color %}is-invalid{% endif %}"
+                   value="{{ datos.color }}"
+                   placeholder="Rojo, negro, azul...">
+            {% if errores.color %}
+                <div class="invalid-feedback">{{ errores.color }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="kilometraje" class="col-sm-3 col-form-label">Kilometraje</label>
+        <div class="col-sm-9">
+            <input type="number" id="kilometraje" name="kilometraje"
+                   class="form-control {% if errores.kilometraje %}is-invalid{% endif %}"
+                   value="{{ datos.kilometraje }}"
+                   min="0"
+                   placeholder="0">
+            {% if errores.kilometraje %}
+                <div class="invalid-feedback">{{ errores.kilometraje }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'vehiculos:mis_motos' %}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-dark">
+            {% if es_edicion %}Guardar cambios{% else %}Registrar moto{% endif %}
+        </button>
+    </div>
+</form>
+{% endblock %}

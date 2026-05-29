@@ -108,7 +108,16 @@
     <div class="login-container">
         <h1 class="form-title">Sistema de Taller</h1>
         <p class="form-subtitle">Iniciar sesión</p>
-        
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
         {% if error %}
         <div class="alert alert-danger" role="alert">
             {{ error }}
@@ -150,7 +159,7 @@
         </div>
         
         <div class="text-center mt-3">
-            <a href="#" class="text-link">¿No tenés cuenta? Regístrate</a>
+            <a href="{% url 'usuarios:registro_cliente' %}" class="text-link">¿No tenés cuenta? Regístrate</a>
         </div>
     </div>
     

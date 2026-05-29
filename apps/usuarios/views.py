@@ -1,10 +1,12 @@
-
 """Vistas de la app usuarios."""
 import re
-from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
+
 from .models import Cliente, dui_validator, telefono_validator
 
 
@@ -64,18 +66,12 @@ def registro_cliente(request):
         cliente.set_password(contrasena)
         cliente.save()
         messages.success(request, 'Cuenta creada correctamente. Ya podés iniciar sesión.')
-        return redirect('usuarios:registro_cliente')
+        return redirect('usuarios:login')
     return render(request, 'usuarios/registro_cliente.html', {'errores': {}, 'datos': {}})
 
 
 class LoginView(View):
-    """
-    Vista para manejar el inicio de sesión del sistema.
-
-    Maneja dos métodos HTTP:
-    - GET: Mostrar el formulario de login
-    - POST: Procesar el formulario y autenticar al usuario
-    """
+    """Vista de login. Acepta DUI o email en el campo `identifier`."""
 
     def get(self, request):
         if request.user.is_authenticated:
@@ -103,17 +99,145 @@ class LoginView(View):
             })
 
     def redirect_by_role(self, user):
-        if user.is_staff:
-            return redirect('admin-panel')
-        if hasattr(user, 'mecanico'):
-            return redirect('panel-mecanico')
-        return redirect('mis-citas')
+        if user.is_admin:
+            return redirect('core:admin_panel')
+        if user.is_mecanico:
+            return redirect('core:panel_mecanico')
+        return redirect('citas:mis_citas')
 
 
 class LogoutView(View):
-    """Vista para cerrar la sesión del usuario."""
+    """Cierra la sesión del usuario."""
 
     def get(self, request):
         logout(request)
         messages.info(request, 'Has cerrado sesión correctamente.')
         return redirect('usuarios:login')
+
+
+@login_required(login_url='usuarios:login')
+def mi_perfil(request):
+    return render(request, 'usuarios/mi_perfil.html')
+
+
+@login_required(login_url='usuarios:login')
+def usuarios_lista(request):
+    return render(request, 'usuarios/usuarios_lista.html')
+
+
+@login_required(login_url='usuarios:login')
+def clientes_lista(request):
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    q = request.GET.get('q', '').strip()
+    clientes = Cliente.objects.all().order_by('apellido', 'nombre')
+    if q:
+        clientes = clientes.filter(
+            Q(dui__icontains=q) |
+            Q(nombre__icontains=q) |
+            Q(apellido__icontains=q) |
+            Q(email__icontains=q)
+        )
+
+    return render(request, 'usuarios/clientes_lista.html', {
+        'clientes': clientes,
+        'q': q,
+        'total': clientes.count(),
+    })
+
+
+@login_required(login_url='usuarios:login')
+def cliente_detalle(request, dui):
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    cliente = get_object_or_404(Cliente, dui=dui)
+    motos = cliente.motocicletas.all().order_by('-activo', '-fecha_registro')
+
+    return render(request, 'usuarios/cliente_detalle.html', {
+        'cliente': cliente,
+        'motos': motos,
+    })
+
+
+@login_required(login_url='usuarios:login')
+def cliente_editar(request, dui):
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    cliente = get_object_or_404(Cliente, dui=dui)
+
+    if request.method == 'POST':
+        errores = {}
+        datos = {
+            'nombre':    request.POST.get('nombre', '').strip(),
+            'apellido':  request.POST.get('apellido', '').strip(),
+            'telefono':  request.POST.get('telefono', '').strip(),
+            'email':     request.POST.get('email', '').strip(),
+            'direccion': request.POST.get('direccion', '').strip(),
+        }
+
+        if not datos['nombre']:
+            errores['nombre'] = 'El nombre es obligatorio.'
+        if not datos['apellido']:
+            errores['apellido'] = 'El apellido es obligatorio.'
+        try:
+            telefono_validator(datos['telefono'])
+        except Exception:
+            errores['telefono'] = 'Formato inválido. Debe ser 0000-0000.'
+        if not re.match(r'^[^@]+@[^@]+\.[^@]+$', datos['email']):
+            errores['email'] = 'Correo electrónico inválido.'
+        if not datos['direccion']:
+            errores['direccion'] = 'La dirección es obligatoria.'
+
+        if Cliente.objects.filter(email=datos['email']).exclude(dui=dui).exists():
+            errores['email'] = 'Ya existe otro cliente con ese correo.'
+
+        if errores:
+            return render(request, 'usuarios/cliente_editar.html', {
+                'cliente': cliente,
+                'datos': datos,
+                'errores': errores,
+            })
+
+        cliente.nombre = datos['nombre']
+        cliente.apellido = datos['apellido']
+        cliente.telefono = datos['telefono']
+        cliente.email = datos['email']
+        cliente.direccion = datos['direccion']
+        cliente.save()
+        messages.success(request, f'Cliente {cliente.nombre_completo} actualizado correctamente.')
+        return redirect('usuarios:cliente_detalle', dui=cliente.dui)
+
+    return render(request, 'usuarios/cliente_editar.html', {
+        'cliente': cliente,
+        'errores': {},
+        'datos': {
+            'nombre':    cliente.nombre,
+            'apellido':  cliente.apellido,
+            'telefono':  cliente.telefono,
+            'email':     cliente.email,
+            'direccion': cliente.direccion,
+        },
+    })
+
+
+@login_required(login_url='usuarios:login')
+def cliente_toggle(request, dui):
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    if request.method != 'POST':
+        return redirect('usuarios:cliente_detalle', dui=dui)
+
+    cliente = get_object_or_404(Cliente, dui=dui)
+    cliente.activo = not cliente.activo
+    cliente.save()
+    estado = 'activado' if cliente.activo else 'desactivado'
+    messages.success(request, f'Cliente {cliente.nombre_completo} {estado}.')
+    return redirect('usuarios:cliente_detalle', dui=cliente.dui)

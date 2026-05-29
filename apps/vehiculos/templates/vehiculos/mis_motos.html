@@ -1,0 +1,70 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Mis motos · Taller{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Mis motocicletas</h1>
+    <a href="{% url 'vehiculos:moto_crear' %}" class="btn btn-dark">+ Registrar moto</a>
+</div>
+
+{% if motos %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Placa</th>
+                <th>Marca / Modelo</th>
+                <th>Año</th>
+                <th>Color</th>
+                <th>Kilometraje</th>
+                <th>Estado</th>
+                <th class="text-end">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for moto in motos %}
+            <tr class="{% if not moto.activo %}text-muted{% endif %}">
+                <td><strong>{{ moto.placa }}</strong></td>
+                <td>{{ moto.marca }} {{ moto.modelo }}</td>
+                <td>{{ moto.anio }}</td>
+                <td>{{ moto.color }}</td>
+                <td>{{ moto.kilometraje }} km</td>
+                <td>
+                    {% if moto.activo %}
+                        <span class="badge bg-success">Activa</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Inactiva</span>
+                    {% endif %}
+                </td>
+                <td class="text-end">
+                    <a href="{% url 'vehiculos:moto_editar' placa=moto.placa %}"
+                       class="btn btn-sm btn-outline-dark">Editar</a>
+                    <form method="post"
+                          action="{% url 'vehiculos:moto_toggle' placa=moto.placa %}"
+                          class="d-inline">
+                        {% csrf_token %}
+                        {% if moto.activo %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('¿Desactivar la moto {{ moto.placa }}?');">
+                                Desactivar
+                            </button>
+                        {% else %}
+                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                Activar
+                            </button>
+                        {% endif %}
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-light text-center py-4">
+    <p class="mb-3">Aún no tenés motos registradas.</p>
+    <a href="{% url 'vehiculos:moto_crear' %}" class="btn btn-dark">Registrar mi primera moto</a>
+</div>
+{% endif %}
+{% endblock %}

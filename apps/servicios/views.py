@@ -1,11 +1,13 @@
-"""Vistas de la app servicios."""
+﻿"""Vistas de la app servicios."""
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Servicio
 
 
+@login_required(login_url='usuarios:login')
 def catalogo_servicios(request):
     """Lista, crea y edita servicios del catálogo (SCRUM-39)."""
 
@@ -14,7 +16,6 @@ def catalogo_servicios(request):
     if busqueda:
         servicios = servicios.filter(nombre__icontains=busqueda)
 
-    # Editar servicio existente
     servicio_editar = None
     editar_id = request.GET.get('editar')
     if editar_id:
@@ -60,7 +61,6 @@ def catalogo_servicios(request):
                 })
 
             if servicio_id:
-                # Editar existente
                 servicio = get_object_or_404(Servicio, id=servicio_id)
                 servicio.nombre = datos['nombre']
                 servicio.descripcion = datos['descripcion']
@@ -69,7 +69,6 @@ def catalogo_servicios(request):
                 servicio.save()
                 messages.success(request, f'Servicio "{servicio.nombre}" actualizado.')
             else:
-                # Crear nuevo
                 servicio = Servicio.objects.create(
                     nombre=datos['nombre'],
                     descripcion=datos['descripcion'],
