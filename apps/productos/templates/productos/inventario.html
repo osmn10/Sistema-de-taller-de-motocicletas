@@ -1,13 +1,136 @@
 {% extends 'core/base.html' %}
 
-{% block title %}Inventario · Taller{% endblock %}
+{% block title %}Inventario — Taller{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Inventario de productos</h1>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
+<!-- Título de la página -->
+<h2 class="mb-4">Inventario de productos</h2>
+
+<!-- Botón para mostrar el formulario de nuevo producto + campo de búsqueda -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Botón que abre/cierra el formulario de crear producto -->
+    <button class="btn btn-dark" type="button" data-bs-toggle="collapse" data-bs-target="#formNuevo">
+        + Nuevo producto
+    </button>
+
+    <!-- Formulario de búsqueda por nombre o proveedor -->
+    <form method="get" class="d-flex gap-2">
+        <input type="text" class="form-control" name="q" placeholder="Buscar por nombre o proveedor" value="{{ busqueda }}">
+        <button type="submit" class="btn btn-outline-dark">Buscar</button>
+    </form>
+</div>
+
+<!-- Formulario colapsable para crear un nuevo producto -->
+<div class="collapse mb-4" id="formNuevo">
+    <div class="border rounded p-4">
+        <p class="text-muted small mb-3">NUEVO PRODUCTO</p>
+        <form method="post" action="{% url 'productos:crear_producto' %}">
+            {% csrf_token %}
+
+            <!-- Campo nombre del producto -->
+            <div class="mb-3">
+                <label class="form-label">Nombre</label>
+                <input type="text" class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+                       name="nombre" value="{{ form_nombre }}" placeholder="Nombre del producto" required>
+                {% if errores.nombre %}<div class="invalid-feedback">{{ errores.nombre }}</div>{% endif %}
+            </div>
+
+            <!-- Campo descripción -->
+            <div class="mb-3">
+                <label class="form-label">Descripción</label>
+                <input type="text" class="form-control" name="descripcion"
+                       value="{{ form_descripcion }}" placeholder="Descripción breve">
+            </div>
+
+            <!-- Fila con precio, stock actual y stock mínimo -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Precio ($)</label>
+                    <input type="number" step="0.01" class="form-control {% if errores.precio %}is-invalid{% endif %}"
+                           name="precio" value="{{ form_precio }}" placeholder="0.00" required>
+                    {% if errores.precio %}<div class="invalid-feedback">{{ errores.precio }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Stock actual</label>
+                    <input type="number" class="form-control" name="stock_actual"
+                           value="{{ form_stock_actual }}" placeholder="0">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Stock mínimo</label>
+                    <input type="number" class="form-control" name="stock_minimo"
+                           value="{{ form_stock_minimo }}" placeholder="5">
+                </div>
+            </div>
+
+            <!-- Selector de proveedor -->
+            <div class="mb-3">
+                <label class="form-label">Proveedor</label>
+                <select class="form-select" name="proveedor">
+                    <option value="">Sin proveedor</option>
+                    {% for prov in proveedores %}
+                    <option value="{{ prov.nit }}">{{ prov.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-dark">Guardar producto</button>
+                <button type="button" class="btn btn-outline-dark" data-bs-toggle="collapse" data-bs-target="#formNuevo">Cancelar</button>
+            </div>
+        </form>
     </div>
 </div>
+
+<!-- Tabla de productos del inventario -->
+{% if productos %}
+<table class="table">
+    <thead>
+        <tr>
+            <th class="text-muted fw-normal small">NOMBRE</th>
+            <th class="text-muted fw-normal small">STOCK</th>
+            <th class="text-muted fw-normal small">MÍN.</th>
+            <th class="text-muted fw-normal small">PRECIO</th>
+            <th class="text-muted fw-normal small">PROVEEDOR</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for producto in productos %}
+        <tr>
+            <td class="align-middle">{{ producto.nombre }}</td>
+            <!-- Si el stock está bajo, mostrarlo en rojo -->
+            <td class="align-middle {% if producto.stock_bajo %}text-danger fw-bold{% endif %}">
+                {{ producto.stock_actual }} unid
+                {% if producto.stock_bajo %} · stock bajo{% endif %}
+            </td>
+            <td class="align-middle">{{ producto.stock_minimo }}</td>
+            <td class="align-middle">${{ producto.precio }}</td>
+            <td class="align-middle">{{ producto.proveedor|default:"—" }}</td>
+            <td class="align-middle text-end">
+                <!-- Link para editar el producto -->
+                <a href="{% url 'productos:editar_producto' producto.id %}" class="text-decoration-none">Editar</a>
+                <!-- Formulario para desactivar el producto -->
+                <form method="post" action="{% url 'productos:desactivar_producto' producto.id %}" class="d-inline ms-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-link text-decoration-none p-0"
+                            onclick="return confirm('¿Desactivar este producto?')">Desactivar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">No hay productos en el inventario.</p>
+{% endif %}
+
+<!-- Alerta de productos con stock bajo -->
+{% if productos_stock_bajo %}
+<div class="border border-danger rounded p-3 mt-3 text-danger">
+    Alerta: {{ productos_stock_bajo|length }} producto{{ productos_stock_bajo|length|pluralize:"s" }} con stock por debajo del mínimo.
+</div>
+{% endif %}
+
 {% endblock %}

@@ -1,5 +1,7 @@
 """Vistas de la app usuarios."""
+
 import re
+
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -117,7 +119,121 @@ class LogoutView(View):
 
 @login_required(login_url='usuarios:login')
 def mi_perfil(request):
-    return render(request, 'usuarios/mi_perfil.html')
+    """
+    Permite al usuario ver y editar su perfil.
+    El DUI no se puede cambiar (es la llave primaria).
+    Opcionalmente puede cambiar su contraseña.
+    """
+    # Obtener el usuario logueado
+    user = request.user
+
+    if request.method == 'POST':
+        # Obtener datos del formulario
+        nombre = request.POST.get('nombre', '').strip()
+        apellido = request.POST.get('apellido', '').strip()
+        telefono = request.POST.get('telefono', '').strip()
+        email = request.POST.get('email', '').strip()
+        # Campos de contraseña (opcionales)
+        password_actual = request.POST.get('password_actual', '').strip()
+        password_nueva = request.POST.get('password_nueva', '').strip()
+
+        # Diccionario para acumular errores
+        errores = {}
+
+        # Validar campos obligatorios
+        if not nombre:
+            errores['nombre'] = 'El nombre es obligatorio.'
+        if not apellido:
+            errores['apellido'] = 'El apellido es obligatorio.'
+        if not telefono:
+            errores['telefono'] = 'El teléfono es obligatorio.'
+        else:
+            # Validar formato del teléfono usando el validador del modelo
+            try:
+                telefono_validator(telefono)
+            except Exception:
+                errores['telefono'] = 'Formato inválido. Debe ser 0000-0000.'
+        if not email:
+            errores['email'] = 'El correo es obligatorio.'
+        elif not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
+            errores['email'] = 'Correo electrónico inválido.'
+
+        # Validar que el email no esté en uso por otro usuario
+        if email and email != user.email:
+            if Cliente.objects.filter(email=email).exclude(dui=user.dui).exists():
+                errores['email'] = 'Este correo ya está en uso por otro usuario.'
+
+        # Validar contraseña (solo si el usuario quiere cambiarla)
+        if password_actual or password_nueva:
+            if not password_actual:
+                errores['password_actual'] = 'Debés ingresar tu contraseña actual.'
+            elif not password_nueva:
+                errores['password_nueva'] = 'Debés ingresar la nueva contraseña.'
+            elif not user.check_password(password_actual):
+                # Verificar que la contraseña actual sea correcta
+                errores['password_actual'] = 'La contraseña actual es incorrecta.'
+            elif len(password_nueva) < 8:
+                errores['password_nueva'] = 'La nueva contraseña debe tener al menos 8 caracteres.'
+
+        # Obtener dirección si es cliente
+        direccion = ''
+        if user.is_cliente:
+            direccion = request.POST.get('direccion', '').strip()
+
+        # Si hay errores, volver a mostrar el formulario
+        if errores:
+            return render(request, 'usuarios/mi_perfil.html', {
+                'errores': errores,
+                'form_nombre': nombre,
+                'form_apellido': apellido,
+                'form_telefono': telefono,
+                'form_email': email,
+                'form_direccion': direccion,
+            })
+
+    # Guardar los cambios según el tipo de usuario
+        if user.is_cliente:
+            # Si es cliente, actualizar TODO en el objeto cliente
+            # (porque cliente hereda de usuario y tiene todos los campos)
+            cliente = user.cliente
+            cliente.nombre = nombre
+            cliente.apellido = apellido
+            cliente.telefono = telefono
+            cliente.email = email
+            cliente.direccion = direccion
+            cliente.save()
+        else:
+            # Si no es cliente (mecánico o admin), guardar en usuario directamente
+            user.nombre = nombre
+            user.apellido = apellido
+            user.telefono = telefono
+            user.email = email
+            user.save()
+
+        # Si quiere cambiar contraseña, actualizarla
+        if password_actual and password_nueva:
+            # set_password hashea la contraseña antes de guardarla
+            user.set_password(password_nueva)
+            user.save()
+            # Re-autenticar para que no se cierre la sesión al cambiar contraseña
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, user)
+
+        messages.success(request, 'Perfil actualizado correctamente.')
+        return redirect('usuarios:mi_perfil')
+
+    # GET: mostrar formulario con datos actuales del usuario
+    direccion = ''
+    if user.is_cliente:
+        direccion = user.cliente.direccion
+
+    return render(request, 'usuarios/mi_perfil.html', {
+        'form_nombre': user.nombre,
+        'form_apellido': user.apellido,
+        'form_telefono': user.telefono,
+        'form_email': user.email,
+        'form_direccion': direccion,
+    })
 
 
 @login_required(login_url='usuarios:login')
