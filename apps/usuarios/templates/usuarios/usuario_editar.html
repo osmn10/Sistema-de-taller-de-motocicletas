@@ -1,0 +1,150 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Editar {{ usuario.nombre_completo }} · Taller{% endblock %}
+
+{% block content %}
+<p class="mb-2">
+    <a href="{% url 'usuarios:usuarios_lista' %}" class="text-decoration-none">&larr; Volver a usuarios</a>
+</p>
+
+<h1 class="h3 mb-4">Editar usuario</h1>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="row mb-3">
+        <label class="col-sm-3 col-form-label">DUI</label>
+        <div class="col-sm-9">
+            <input type="text" class="form-control" value="{{ usuario.dui }}" disabled>
+            <small class="text-muted">El DUI no se puede modificar.</small>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="nombre" class="col-sm-3 col-form-label">Nombre</label>
+        <div class="col-sm-9">
+            <input type="text" id="nombre" name="nombre"
+                   class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+                   value="{{ datos.nombre }}">
+            {% if errores.nombre %}
+                <div class="invalid-feedback">{{ errores.nombre }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="apellido" class="col-sm-3 col-form-label">Apellido</label>
+        <div class="col-sm-9">
+            <input type="text" id="apellido" name="apellido"
+                   class="form-control {% if errores.apellido %}is-invalid{% endif %}"
+                   value="{{ datos.apellido }}">
+            {% if errores.apellido %}
+                <div class="invalid-feedback">{{ errores.apellido }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="telefono" class="col-sm-3 col-form-label">Teléfono</label>
+        <div class="col-sm-9">
+            <input type="text" id="telefono" name="telefono"
+                   class="form-control {% if errores.telefono %}is-invalid{% endif %}"
+                   value="{{ datos.telefono }}"
+                   placeholder="0000-0000"
+                   maxlength="9"
+                   data-mask="telefono"
+                   inputmode="numeric">
+            {% if errores.telefono %}
+                <div class="invalid-feedback">{{ errores.telefono }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="email" class="col-sm-3 col-form-label">Correo</label>
+        <div class="col-sm-9">
+            <input type="email" id="email" name="email"
+                   class="form-control {% if errores.email %}is-invalid{% endif %}"
+                   value="{{ datos.email }}">
+            {% if errores.email %}
+                <div class="invalid-feedback">{{ errores.email }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="rol" class="col-sm-3 col-form-label">Rol</label>
+        <div class="col-sm-9">
+            <select id="rol" name="rol"
+                    class="form-select {% if errores.rol %}is-invalid{% endif %}">
+                <option value="admin"    {% if datos.rol == 'admin'    %}selected{% endif %}>Administrador</option>
+                <option value="mecanico" {% if datos.rol == 'mecanico' %}selected{% endif %}>Mecánico</option>
+            </select>
+            {% if errores.rol %}
+                <div class="invalid-feedback">{{ errores.rol }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="campo-especialidad" class="row mb-3">
+        <label for="especialidad" class="col-sm-3 col-form-label">Especialidad</label>
+        <div class="col-sm-9">
+            <select id="especialidad" name="especialidad"
+                    class="form-select {% if errores.especialidad %}is-invalid{% endif %}">
+                <option value="">Seleccioná una especialidad</option>
+                {% for valor, etiqueta in especialidades %}
+                    <option value="{{ valor }}" {% if datos.especialidad == valor %}selected{% endif %}>
+                        {{ etiqueta }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if errores.especialidad %}
+                <div class="invalid-feedback">{{ errores.especialidad }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'usuarios:usuarios_lista' %}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Guardar cambios</button>
+    </div>
+</form>
+
+<hr class="my-5">
+
+<h2 class="h5 mb-3">Restablecer contraseña</h2>
+
+<form method="post"
+      action="{% url 'usuarios:usuario_reset_password' dui=usuario.dui %}"
+      novalidate
+      onsubmit="return confirm('¿Restablecer la contraseña de {{ usuario.nombre_completo }}?')">
+    {% csrf_token %}
+
+    <div class="row mb-3">
+        <label for="nueva_contrasena" class="col-sm-3 col-form-label">Nueva contraseña</label>
+        <div class="col-sm-9">
+            <input type="password" id="nueva_contrasena" name="nueva_contrasena"
+                   class="form-control"
+                   autocomplete="new-password"
+                   placeholder="Mínimo 8 caracteres">
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-outline-danger">Restablecer contraseña</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleEspecialidad() {
+        var rol = document.getElementById('rol').value;
+        document.getElementById('campo-especialidad').style.display = rol === 'mecanico' ? '' : 'none';
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        toggleEspecialidad();
+        document.getElementById('rol').addEventListener('change', toggleEspecialidad);
+    });
+</script>
+{% endblock %}
