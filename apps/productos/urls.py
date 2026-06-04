@@ -1,11 +1,11 @@
-"""URLs de la app productos."""
-
-from django.urls import path
-
-from . import views
+﻿from django.urls import path
+from django.shortcuts import render
 
 app_name = 'productos'
 
+def inventario(request):
+    return render(request, 'productos/inventario.html')
+
 urlpatterns = [
-    path('', views.inventario, name='inventario'),
+    path('inventario/', inventario, name='inventario'),
 ]

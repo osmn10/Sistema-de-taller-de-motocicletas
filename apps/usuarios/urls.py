@@ -1,4 +1,4 @@
-"""URLs de la app usuarios."""
+﻿"""URLs de la app usuarios."""
 
 from django.urls import path
 
@@ -12,7 +12,6 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('registro/', views.registro_cliente, name='registro_cliente'),
     path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
-
     path('clientes/', views.clientes_lista, name='clientes_lista'),
     path('clientes/<str:dui>/', views.cliente_detalle, name='cliente_detalle'),
     path('clientes/<str:dui>/editar/', views.cliente_editar, name='cliente_editar'),
@@ -25,3 +24,5 @@ path('usuarios/', views.usuarios_lista, name='usuarios_lista'),
     path('usuarios/<str:dui>/reset-password/', views.usuario_reset_password, name='usuario_reset_password'),]
 
 
+    path('usuarios/', views.usuarios_lista, name='usuarios_lista'),
+]
