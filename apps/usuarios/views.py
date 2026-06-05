@@ -117,7 +117,102 @@ class LogoutView(View):
 
 @login_required(login_url='usuarios:login')
 def mi_perfil(request):
-    return render(request, 'usuarios/mi_perfil.html')
+    """
+    Permite al usuario ver y editar su perfil.
+    El DUI no se puede cambiar (es la llave primaria).
+    Opcionalmente puede cambiar su contraseña.
+    """
+    user = request.user
+
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        apellido = request.POST.get('apellido', '').strip()
+        telefono = request.POST.get('telefono', '').strip()
+        email = request.POST.get('email', '').strip()
+        password_actual = request.POST.get('password_actual', '').strip()
+        password_nueva = request.POST.get('password_nueva', '').strip()
+
+        errores = {}
+
+        if not nombre:
+            errores['nombre'] = 'El nombre es obligatorio.'
+        if not apellido:
+            errores['apellido'] = 'El apellido es obligatorio.'
+        if not telefono:
+            errores['telefono'] = 'El teléfono es obligatorio.'
+        else:
+            try:
+                telefono_validator(telefono)
+            except Exception:
+                errores['telefono'] = 'Formato inválido. Debe ser 0000-0000.'
+        if not email:
+            errores['email'] = 'El correo es obligatorio.'
+        elif not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
+            errores['email'] = 'Correo electrónico inválido.'
+
+        if email and email != user.email:
+            if Cliente.objects.filter(email=email).exclude(dui=user.dui).exists():
+                errores['email'] = 'Este correo ya está en uso por otro usuario.'
+
+        if password_actual or password_nueva:
+            if not password_actual:
+                errores['password_actual'] = 'Debés ingresar tu contraseña actual.'
+            elif not password_nueva:
+                errores['password_nueva'] = 'Debés ingresar la nueva contraseña.'
+            elif not user.check_password(password_actual):
+                errores['password_actual'] = 'La contraseña actual es incorrecta.'
+            elif len(password_nueva) < 8:
+                errores['password_nueva'] = 'La nueva contraseña debe tener al menos 8 caracteres.'
+
+        direccion = ''
+        if user.is_cliente:
+            direccion = request.POST.get('direccion', '').strip()
+
+        if errores:
+            return render(request, 'usuarios/mi_perfil.html', {
+                'errores': errores,
+                'form_nombre': nombre,
+                'form_apellido': apellido,
+                'form_telefono': telefono,
+                'form_email': email,
+                'form_direccion': direccion,
+            })
+
+        if user.is_cliente:
+            cliente = user.cliente
+            cliente.nombre = nombre
+            cliente.apellido = apellido
+            cliente.telefono = telefono
+            cliente.email = email
+            cliente.direccion = direccion
+            cliente.save()
+        else:
+            user.nombre = nombre
+            user.apellido = apellido
+            user.telefono = telefono
+            user.email = email
+            user.save()
+
+        if password_actual and password_nueva:
+            user.set_password(password_nueva)
+            user.save()
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, user)
+
+        messages.success(request, 'Perfil actualizado correctamente.')
+        return redirect('usuarios:mi_perfil')
+
+    direccion = ''
+    if user.is_cliente:
+        direccion = user.cliente.direccion
+
+    return render(request, 'usuarios/mi_perfil.html', {
+        'form_nombre': user.nombre,
+        'form_apellido': user.apellido,
+        'form_telefono': user.telefono,
+        'form_email': user.email,
+        'form_direccion': direccion,
+    })
 
 
 @login_required(login_url='usuarios:login')
@@ -412,13 +507,16 @@ def usuario_reset_password(request, dui):
 
 @login_required(login_url='usuarios:login')
 def clientes_lista(request):
+    """SCRUM-29. Tabla de clientes para el admin con búsqueda por DUI, nombre, apellido o correo."""
     if not request.user.is_admin:
         messages.error(request, 'No tenés permiso para acceder a esta sección.')
         return redirect('core:home')
 
+    # `q` es opcional: si no viene, lista todo
     q = request.GET.get('q', '').strip()
     clientes = Cliente.objects.all().order_by('apellido', 'nombre')
     if q:
+        # `icontains` = LIKE case-insensitive; Q permite combinar con OR (uno cualquiera coincide)
         clientes = clientes.filter(
             Q(dui__icontains=q) |
             Q(nombre__icontains=q) |
@@ -435,11 +533,13 @@ def clientes_lista(request):
 
 @login_required(login_url='usuarios:login')
 def cliente_detalle(request, dui):
+    """SCRUM-29. Vista de detalle de un cliente con sus motos asociadas (solo lectura para admin)."""
     if not request.user.is_admin:
         messages.error(request, 'No tenés permiso para acceder a esta sección.')
         return redirect('core:home')
 
     cliente = get_object_or_404(Cliente, dui=dui)
+    # related_name='motocicletas' definido en el FK del modelo Motocicleta → cliente.motocicletas.all()
     motos = cliente.motocicletas.all().order_by('-activo', '-fecha_registro')
 
     return render(request, 'usuarios/cliente_detalle.html', {
@@ -450,6 +550,7 @@ def cliente_detalle(request, dui):
 
 @login_required(login_url='usuarios:login')
 def cliente_editar(request, dui):
+    """SCRUM-29. Edita datos del cliente. El DUI no se toca (es PK)."""
     if not request.user.is_admin:
         messages.error(request, 'No tenés permiso para acceder a esta sección.')
         return redirect('core:home')
@@ -458,6 +559,7 @@ def cliente_editar(request, dui):
 
     if request.method == 'POST':
         errores = {}
+        # patrón del proyecto: validación manual, sin django.forms — control total del markup
         datos = {
             'nombre':    request.POST.get('nombre', '').strip(),
             'apellido':  request.POST.get('apellido', '').strip(),
@@ -471,7 +573,7 @@ def cliente_editar(request, dui):
         if not datos['apellido']:
             errores['apellido'] = 'El apellido es obligatorio.'
         try:
-            telefono_validator(datos['telefono'])
+            telefono_validator(datos['telefono'])  # ya valida formato 0000-0000
         except Exception:
             errores['telefono'] = 'Formato inválido. Debe ser 0000-0000.'
         if not re.match(r'^[^@]+@[^@]+\.[^@]+$', datos['email']):
@@ -479,6 +581,7 @@ def cliente_editar(request, dui):
         if not datos['direccion']:
             errores['direccion'] = 'La dirección es obligatoria.'
 
+        # excluye al propio cliente para que no se choque consigo mismo al "cambiar" al mismo correo
         if Cliente.objects.filter(email=datos['email']).exclude(dui=dui).exists():
             errores['email'] = 'Ya existe otro cliente con ese correo.'
 
@@ -513,10 +616,12 @@ def cliente_editar(request, dui):
 
 @login_required(login_url='usuarios:login')
 def cliente_toggle(request, dui):
+    """SCRUM-29. Soft delete del cliente. No borramos físicamente — preservamos motos e historial."""
     if not request.user.is_admin:
         messages.error(request, 'No tenés permiso para acceder a esta sección.')
         return redirect('core:home')
 
+    # solo POST: un GET no debe poder activar/desactivar
     if request.method != 'POST':
         return redirect('usuarios:cliente_detalle', dui=dui)
 

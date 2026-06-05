@@ -4,7 +4,10 @@
 
 {% block content %}
 <p class="text-muted small mb-1">MIS CITAS</p>
-<h2 class="mb-4">Mis citas</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Mis citas</h2>
+    <a href="{% url 'citas:disponibilidad' %}" class="btn btn-outline-dark">Ver disponibilidad</a>
+</div>
 
 {% if citas %}
 <table class="table">
@@ -36,6 +39,6 @@
     </tbody>
 </table>
 {% else %}
-<p class="text-muted">No tenés citas programadas. <a href="#">Agendá una ahora</a>.</p>
+<p class="text-muted">No tenés citas programadas. <a href="{% url 'citas:disponibilidad' %}">Agendá una ahora</a>.</p>
 {% endif %}
 {% endblock %}

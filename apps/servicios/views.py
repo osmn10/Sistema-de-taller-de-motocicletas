@@ -77,7 +77,7 @@ def catalogo_servicios(request):
                 )
                 messages.success(request, f'Servicio "{servicio.nombre}" creado.')
 
-            return redirect('servicios:catalogo_servicios')
+            return redirect('servicios:catalogo')
 
         elif accion == 'desactivar':
             servicio_id = request.POST.get('servicio_id')
@@ -85,7 +85,7 @@ def catalogo_servicios(request):
             servicio.activo = False
             servicio.save()
             messages.success(request, f'Servicio "{servicio.nombre}" desactivado.')
-            return redirect('servicios:catalogo_servicios')
+            return redirect('servicios:catalogo')
 
         elif accion == 'activar':
             servicio_id = request.POST.get('servicio_id')
@@ -93,7 +93,7 @@ def catalogo_servicios(request):
             servicio.activo = True
             servicio.save()
             messages.success(request, f'Servicio "{servicio.nombre}" activado.')
-            return redirect('servicios:catalogo_servicios')
+            return redirect('servicios:catalogo')
 
     return render(request, 'servicios/catalogo_servicios.html', {
         'servicios': servicios,

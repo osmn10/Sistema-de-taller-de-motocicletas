@@ -1,4 +1,4 @@
-"""Vistas de la app vehiculos."""
+"""Vistas de la app vehiculos. SCRUM-36: gestión de motocicletas del cliente."""
 import datetime
 
 from django.contrib import messages
@@ -10,10 +10,12 @@ from .models import Motocicleta, placa_validator
 
 @login_required(login_url='usuarios:login')
 def mis_motos(request):
+    """Lista las motos del cliente logueado. Las activas arriba, luego las desactivadas."""
     if not request.user.is_cliente:
         messages.error(request, 'Solo los clientes pueden acceder a esta sección.')
         return redirect('core:home')
 
+    # filtramos por dueño: el cliente solo ve sus propias motos
     motos = Motocicleta.objects.filter(cliente=request.user.cliente).order_by('-activo', '-fecha_registro')
 
     return render(request, 'vehiculos/mis_motos.html', {
@@ -24,15 +26,18 @@ def mis_motos(request):
 
 @login_required(login_url='usuarios:login')
 def moto_crear(request):
+    """Registra una moto nueva asociada al cliente logueado."""
     if not request.user.is_cliente:
         messages.error(request, 'Solo los clientes pueden registrar motos.')
         return redirect('core:home')
 
+    # tope de año: hoy + 1 para permitir modelos del próximo año (lanzamientos)
     anio_max = datetime.date.today().year + 1
 
     if request.method == 'POST':
         errores = {}
         datos = {
+            # placa SIEMPRE en mayúsculas para que coincida con el regex M-####
             'placa':       request.POST.get('placa', '').strip().upper(),
             'marca':       request.POST.get('marca', '').strip(),
             'modelo':      request.POST.get('modelo', '').strip(),
@@ -41,10 +46,12 @@ def moto_crear(request):
             'kilometraje': request.POST.get('kilometraje', '').strip(),
         }
 
+        # reusamos el validator del modelo en vez de redefinir la regex aquí
         try:
             placa_validator(datos['placa'])
         except Exception:
             errores['placa'] = 'Formato inválido. Debe ser M-#### (ej. M-1234).'
+        # placa es PK → no puede repetirse a nivel global del sistema
         if datos['placa'] and Motocicleta.objects.filter(placa=datos['placa']).exists():
             errores['placa'] = 'Ya existe una moto con esa placa.'
 
@@ -101,17 +108,19 @@ def moto_crear(request):
 
 @login_required(login_url='usuarios:login')
 def moto_editar(request, placa):
+    """Edita una moto del cliente. La placa NO se edita (es PK)."""
     if not request.user.is_cliente:
         messages.error(request, 'Solo los clientes pueden editar motos.')
         return redirect('core:home')
 
+    # ojo al filtro doble: placa + cliente — evita que un cliente edite la moto de otro
     moto = get_object_or_404(Motocicleta, placa=placa, cliente=request.user.cliente)
     anio_max = datetime.date.today().year + 1
 
     if request.method == 'POST':
         errores = {}
         datos = {
-            'placa':       moto.placa,
+            'placa':       moto.placa,  # readonly: no se permite cambiar la PK
             'marca':       request.POST.get('marca', '').strip(),
             'modelo':      request.POST.get('modelo', '').strip(),
             'anio':        request.POST.get('anio', '').strip(),
@@ -178,9 +187,11 @@ def moto_editar(request, placa):
 
 @login_required(login_url='usuarios:login')
 def moto_toggle(request, placa):
+    """Soft delete / re-activación. No borramos motos físicamente para no romper el historial de citas."""
     if not request.user.is_cliente:
         return redirect('core:home')
 
+    # solo aceptamos POST: evita que un GET accidental (link, prefetch del browser) cambie el estado
     if request.method != 'POST':
         return redirect('vehiculos:mis_motos')
 

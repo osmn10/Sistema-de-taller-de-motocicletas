@@ -1,13 +1,87 @@
 {% extends 'core/base.html' %}
 
-{% block title %}Mi perfil · Taller{% endblock %}
+{% block title %}Mi perfil — Taller{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Mi perfil</h1>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
+<!-- Título de la página -->
+<h2 class="mb-4">Mi perfil</h2>
+
+<!-- Formulario de edición del perfil -->
+<form method="post">
+    {% csrf_token %}
+
+    <!-- Campo DUI (no editable, es la llave primaria) -->
+    <div class="mb-3">
+        <label class="form-label text-muted small">DUI</label>
+        <input type="text" class="form-control" value="{{ request.user.dui }} · no editable" readonly disabled>
     </div>
-</div>
+
+    <!-- Campo Nombre -->
+    <div class="mb-3">
+        <label class="form-label text-muted small">Nombre</label>
+        <input type="text" class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+               name="nombre" value="{{ form_nombre }}" required>
+        {% if errores.nombre %}<div class="invalid-feedback">{{ errores.nombre }}</div>{% endif %}
+    </div>
+
+    <!-- Campo Apellido -->
+    <div class="mb-3">
+        <label class="form-label text-muted small">Apellido</label>
+        <input type="text" class="form-control {% if errores.apellido %}is-invalid{% endif %}"
+               name="apellido" value="{{ form_apellido }}" required>
+        {% if errores.apellido %}<div class="invalid-feedback">{{ errores.apellido }}</div>{% endif %}
+    </div>
+
+    <!-- Campo Teléfono con máscara automática -->
+    <div class="mb-3">
+        <label class="form-label text-muted small">Teléfono</label>
+        <input type="text" class="form-control {% if errores.telefono %}is-invalid{% endif %}"
+               name="telefono" value="{{ form_telefono }}" placeholder="0000-0000"
+               data-mask="telefono" required>
+        {% if errores.telefono %}<div class="invalid-feedback">{{ errores.telefono }}</div>{% endif %}
+    </div>
+
+    <!-- Campo Correo electrónico -->
+    <div class="mb-3">
+        <label class="form-label text-muted small">Correo</label>
+        <input type="email" class="form-control {% if errores.email %}is-invalid{% endif %}"
+               name="email" value="{{ form_email }}" required>
+        {% if errores.email %}<div class="invalid-feedback">{{ errores.email }}</div>{% endif %}
+    </div>
+
+    <!-- Campo Dirección (solo visible para clientes) -->
+    {% if request.user.is_cliente %}
+    <div class="mb-3">
+        <label class="form-label text-muted small">Dirección</label>
+        <input type="text" class="form-control" name="direccion" value="{{ form_direccion }}">
+    </div>
+    {% endif %}
+
+    <!-- Sección de cambio de contraseña (opcional) -->
+    <p class="text-muted small mt-4 mb-2">CAMBIAR CONTRASEÑA (OPCIONAL)</p>
+
+    <!-- Campo contraseña actual -->
+    <div class="mb-3">
+        <label class="form-label text-muted small">Contraseña actual</label>
+        <input type="password" class="form-control {% if errores.password_actual %}is-invalid{% endif %}"
+               name="password_actual" placeholder="••••••••">
+        {% if errores.password_actual %}<div class="invalid-feedback">{{ errores.password_actual }}</div>{% endif %}
+    </div>
+
+    <!-- Campo nueva contraseña -->
+    <div class="mb-3">
+        <label class="form-label text-muted small">Nueva contraseña</label>
+        <input type="password" class="form-control {% if errores.password_nueva %}is-invalid{% endif %}"
+               name="password_nueva" placeholder="••••••••">
+        {% if errores.password_nueva %}<div class="invalid-feedback">{{ errores.password_nueva }}</div>{% endif %}
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'citas:mis_citas' %}" class="btn btn-outline-dark">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Guardar cambios</button>
+    </div>
+</form>
+
 {% endblock %}
