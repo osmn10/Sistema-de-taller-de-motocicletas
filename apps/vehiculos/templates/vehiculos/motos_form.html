@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{# SCRUM-36: un solo template sirve para crear y editar — el flag es_edicion cambia la UI mínima. #}
 
 {% block title %}
     {% if es_edicion %}Editar moto{% else %}Registrar moto{% endif %} · Taller
@@ -20,9 +21,11 @@
         <label for="placa" class="col-sm-3 col-form-label">Placa</label>
         <div class="col-sm-9">
             {% if es_edicion %}
+                {# en edición la placa va disabled: es PK, cambiarla romperia el historial de citas #}
                 <input type="text" class="form-control" value="{{ datos.placa }}" disabled>
                 <small class="text-muted">La placa no se puede modificar.</small>
             {% else %}
+                {# data-mask="placa" → static/js/masks.js inserta el guión automáticamente #}
                 <input type="text" id="placa" name="placa"
                        class="form-control {% if errores.placa %}is-invalid{% endif %}"
                        value="{{ datos.placa }}"

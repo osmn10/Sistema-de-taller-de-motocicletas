@@ -5,9 +5,82 @@
 {% block content %}
 <h1 class="h3 mb-4">Horario de atención del taller</h1>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
+<p class="text-muted">
+    Definí por cada día si el taller atiende y en qué rango horario.
+    Los días marcados como cerrados no permitirán agendar citas.
+</p>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Día</th>
+                    <th class="text-center">Atiende</th>
+                    <th>Apertura</th>
+                    <th>Cierre</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in horarios %}
+                <tr>
+                    <td class="fw-semibold">{{ h.nombre }}</td>
+                    <td class="text-center">
+                        <div class="form-check form-switch d-inline-block">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   id="abierto_{{ h.dia }}"
+                                   name="abierto_{{ h.dia }}"
+                                   data-dia="{{ h.dia }}"
+                                   {% if h.abierto %}checked{% endif %}>
+                        </div>
+                    </td>
+                    <td>
+                        <input type="time"
+                               class="form-control {% if h.error %}is-invalid{% endif %}"
+                               id="apertura_{{ h.dia }}"
+                               name="apertura_{{ h.dia }}"
+                               value="{{ h.apertura }}"
+                               {% if not h.abierto %}disabled{% endif %}>
+                    </td>
+                    <td>
+                        <input type="time"
+                               class="form-control {% if h.error %}is-invalid{% endif %}"
+                               id="cierre_{{ h.dia }}"
+                               name="cierre_{{ h.dia }}"
+                               value="{{ h.cierre }}"
+                               {% if not h.abierto %}disabled{% endif %}>
+                        {% if h.error %}
+                            <div class="invalid-feedback d-block">{{ h.error }}</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-</div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-dark">Guardar horario</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('input[data-dia]').forEach(function (chk) {
+            function sincronizar() {
+                var dia = chk.dataset.dia;
+                var deshabilitado = !chk.checked;
+                document.getElementById('apertura_' + dia).disabled = deshabilitado;
+                document.getElementById('cierre_' + dia).disabled = deshabilitado;
+            }
+            chk.addEventListener('change', sincronizar);
+            sincronizar();
+        });
+    });
+</script>
 {% endblock %}
