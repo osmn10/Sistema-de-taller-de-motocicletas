@@ -61,3 +61,20 @@ class ServicioCita(models.Model):
 
     def __str__(self):
         return f'{self.servicio.nombre} — Cita #{self.cita.id}'
+class CambioEstadoCita(models.Model):
+    """Registra cada transición de estado de una cita."""
+
+    cita = models.ForeignKey(Cita, on_delete=models.CASCADE, related_name='cambios_estado')
+    estado_anterior = models.CharField(max_length=20, choices=Cita.ESTADOS)
+    estado_nuevo = models.CharField(max_length=20, choices=Cita.ESTADOS)
+    motivo = models.TextField(blank=True)
+    realizado_por = models.ForeignKey('usuarios.Usuario', on_delete=models.PROTECT, related_name='cambios_estado')
+    fecha_cambio = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_cambio']
+        verbose_name = 'Cambio de estado'
+        verbose_name_plural = 'Cambios de estado'
+
+    def __str__(self):
+        return f'Cita #{self.cita.id}: {self.estado_anterior} -> {self.estado_nuevo}'

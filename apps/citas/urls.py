@@ -13,5 +13,6 @@ urlpatterns = [
     path('disponibilidad/', views.disponibilidad, name='disponibilidad'),
     path('agendar/', views.agendar_cita, name='agendar_cita'),
     path('calendario/', views.calendario, name='calendario'),
+    path('calendario/<int:cita_id>/', views.cita_admin_detalle, name='cita_admin_detalle'),
     path('mis-citas-mecanico/', views.mis_citas_mecanico, name='mis_citas_mecanico'),
 ]

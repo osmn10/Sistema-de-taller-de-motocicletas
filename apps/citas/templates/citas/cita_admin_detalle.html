@@ -1,0 +1,104 @@
+{% extends "core/base.html" %}
+
+{% block title %}Cita #{{ cita.id }} — Admin{% endblock %}
+
+{% block content %}
+<a href="{% url 'citas:calendario' %}" class="text-decoration-none text-muted small">‹ Volver al calendario</a>
+
+<div class="mt-3 mb-4 d-flex align-items-center gap-3">
+    <h2 class="mb-0">Cita #{{ cita.id }}</h2>
+    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">
+        {{ cita.get_estado_display }}
+    </span>
+</div>
+
+<div class="row">
+    <div class="col-md-7">
+
+        <p class="text-muted small mb-1">FECHA Y HORA</p>
+        <p class="mb-4">{{ cita.fecha|date:"j N Y" }} · {{ cita.hora|time:"H:i" }}</p>
+
+        <p class="text-muted small mb-1">CLIENTE</p>
+        <p class="mb-4">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }} — {{ cita.cliente.dui }}</p>
+
+        <p class="text-muted small mb-1">MOTOCICLETA</p>
+        <p class="mb-4">{{ cita.motocicleta }}</p>
+
+        <p class="text-muted small mb-1">MECÁNICO ASIGNADO</p>
+        <p class="mb-4">
+            {% if cita.mecanico %}
+                {{ cita.mecanico.nombre }} {{ cita.mecanico.apellido }}
+            {% else %}
+                <span class="text-muted">Sin asignar</span>
+            {% endif %}
+        </p>
+
+        <p class="text-muted small mb-1">SERVICIOS SOLICITADOS</p>
+        <div class="mb-4">
+            {% for sc in servicios %}
+            <div class="border rounded p-3 mb-2" style="border-style: dashed !important;">
+                {{ sc.servicio.nombre }} · ${{ sc.precio_final }}
+            </div>
+            {% empty %}
+            <p class="text-muted">Sin servicios registrados.</p>
+            {% endfor %}
+        </div>
+
+        {% if cita.observaciones %}
+        <p class="text-muted small mb-1">OBSERVACIONES</p>
+        <p class="mb-4">{{ cita.observaciones }}</p>
+        {% endif %}
+
+        {% if estados_posibles %}
+        <hr class="my-4">
+        <p class="text-muted small mb-3">CAMBIAR ESTADO</p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="row mb-3 align-items-start">
+                <label class="col-sm-3 col-form-label">Nuevo estado</label>
+                <div class="col-sm-9">
+                    <select name="nuevo_estado" class="form-select" style="border-style: dashed;" required>
+                        <option value="">Seleccioná un estado</option>
+                        {% for estado in estados_posibles %}
+                        <option value="{{ estado }}">{{ estados_display|dict_get:estado }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mb-3 align-items-start">
+                <label class="col-sm-3 col-form-label">Motivo</label>
+                <div class="col-sm-9">
+                    <input type="text" name="motivo" class="form-control"
+                           placeholder="Obligatorio si cancelás"
+                           style="border-style: dashed;">
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'citas:calendario' %}" class="btn btn-outline-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-dark">Guardar cambio</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="col-md-5">
+        <p class="text-muted small mb-3">HISTORIAL DE CAMBIOS</p>
+        {% for cambio in cambios %}
+        <div class="border rounded p-3 mb-2" style="border-style: dashed !important;">
+            <p class="small mb-1">
+                <strong>{{ cambio.estado_anterior }} → {{ cambio.estado_nuevo }}</strong>
+            </p>
+            <p class="small text-muted mb-1">
+                {{ cambio.fecha_cambio|date:"j N Y H:i" }} —
+                {{ cambio.realizado_por.nombre }} {{ cambio.realizado_por.apellido }}
+            </p>
+            {% if cambio.motivo %}
+            <p class="small mb-0">{{ cambio.motivo }}</p>
+            {% endif %}
+        </div>
+        {% empty %}
+        <p class="text-muted small">Sin cambios registrados.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
