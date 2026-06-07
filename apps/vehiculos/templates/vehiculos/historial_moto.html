@@ -1,0 +1,52 @@
+{% extends "core/base.html" %}
+
+{% block title %}Historial · {{ moto.placa }} — Taller de Motos{% endblock %}
+
+{% block content %}
+<a href="{% url 'vehiculos:mis_motos' %}" class="text-decoration-none text-muted small">‹ Volver a mis motos</a>
+
+<div class="mt-3 mb-4 d-flex justify-content-between align-items-center">
+    <div>
+        <p class="text-muted small mb-1">HISTORIAL DE SERVICIOS</p>
+        <h2 class="mb-0">{{ moto.placa }} · {{ moto.marca }} {{ moto.modelo }} · {{ moto.anio }}</h2>
+    </div>
+</div>
+
+{% if citas %}
+<table class="table table-hover align-middle">
+    <thead>
+        <tr>
+            <th class="text-muted fw-normal small">FECHA</th>
+            <th class="text-muted fw-normal small">SERVICIOS</th>
+            <th class="text-muted fw-normal small">VEHÍCULO</th>
+            <th class="text-muted fw-normal small">ESTADO</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cita in citas %}
+        <tr>
+            <td>{{ cita.fecha|date:"j N Y" }} · {{ cita.hora|time:"H:i" }}</td>
+            <td>
+                {% for sc in cita.serviciocita_set.all %}
+                    <span class="badge bg-secondary me-1">{{ sc.servicio.nombre }}</span>
+                {% empty %}
+                    <span class="text-muted">Sin servicios</span>
+                {% endfor %}
+            </td>
+            <td>{{ moto.placa }} · {{ moto.marca }} {{ moto.modelo }}</td>
+            <td>
+                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">
+                    {{ cita.get_estado_display }}
+                </span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="alert alert-light text-center py-5 mt-4">
+    <p class="mb-3">Esta moto aún no tiene servicios registrados.</p>
+    <a href="{% url 'citas:disponibilidad' %}" class="btn btn-dark">Agendar un servicio</a>
+</div>
+{% endif %}
+{% endblock %}

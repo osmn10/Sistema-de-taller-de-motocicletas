@@ -201,3 +201,27 @@ def moto_toggle(request, placa):
     estado = 'activada' if moto.activo else 'desactivada'
     messages.success(request, f'Moto {moto.placa} {estado}.')
     return redirect('vehiculos:mis_motos')
+
+@login_required(login_url='usuarios:login')
+def historial_moto(request, placa):
+    """SCRUM-28. Historial de servicios completados de una motocicleta."""
+    from apps.citas.models import Cita
+
+    if request.user.is_cliente:
+        moto = get_object_or_404(Motocicleta, placa=placa, cliente=request.user.cliente)
+    elif request.user.is_admin:
+        moto = get_object_or_404(Motocicleta, placa=placa)
+    else:
+        messages.error(request, 'No tenés permiso para ver este historial.')
+        return redirect('core:home')
+
+    citas = Cita.objects.filter(
+        motocicleta=moto,
+    ).exclude(
+        estado=Cita.ESTADO_CANCELADA
+    ).prefetch_related('serviciocita_set__servicio').order_by('-fecha', '-hora')
+
+    return render(request, 'vehiculos/historial_moto.html', {
+        'moto': moto,
+        'citas': citas,
+    })
