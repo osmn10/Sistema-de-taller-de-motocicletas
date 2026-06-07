@@ -25,7 +25,6 @@
         </thead>
         <tbody>
             {% for moto in motos %}
-            {# fila en gris si la moto está inactiva para que se vea distinta #}
             <tr class="{% if not moto.activo %}text-muted{% endif %}">
                 <td><strong>{{ moto.placa }}</strong></td>
                 <td>{{ moto.marca }} {{ moto.modelo }}</td>
@@ -40,9 +39,10 @@
                     {% endif %}
                 </td>
                 <td class="text-end">
+                    <a href="{% url 'vehiculos:historial_moto' placa=moto.placa %}"
+                       class="btn btn-sm btn-outline-secondary">Historial</a>
                     <a href="{% url 'vehiculos:moto_editar' placa=moto.placa %}"
                        class="btn btn-sm btn-outline-dark">Editar</a>
-                    {# toggle va por POST con CSRF: cambiar estado por GET seria peligroso #}
                     <form method="post"
                           action="{% url 'vehiculos:moto_toggle' placa=moto.placa %}"
                           class="d-inline">
