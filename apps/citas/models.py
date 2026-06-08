@@ -45,6 +45,10 @@ class Cita(models.Model):
     def puede_cancelarse(self):
         """Solo se puede cancelar si está pendiente o confirmada."""
         return self.estado in [self.ESTADO_PENDIENTE, self.ESTADO_CONFIRMADA]
+    
+    def puede_reagendarse(self):
+        """Solo se puede reagendar si está pendiente o confirmada."""
+        return self.estado in [self.ESTADO_PENDIENTE, self.ESTADO_CONFIRMADA]
 
 
 class ServicioCita(models.Model):
