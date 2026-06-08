@@ -9,7 +9,10 @@
 
 <!-- Subtítulo y título de la sección -->
 <p class="text-muted small mb-1">MIS CITAS</p>
-<h2 class="mb-4">Mis citas</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Mis citas</h2>
+    <a href="{% url 'citas:disponibilidad' %}" class="btn btn-outline-dark">Ver disponibilidad</a>
+</div>
 
 <!-- Si el cliente tiene citas, mostrar la tabla -->
 {% if citas %}
@@ -76,8 +79,89 @@
 </table>
 
 <!-- Si el cliente no tiene citas, mostrar mensaje -->
+{% if not futuras and not pasadas %}
+<div class="text-center py-5">
+    <p class="text-muted mb-3">Todavía no tenés citas registradas.</p>
+    <a href="{% url 'citas:disponibilidad' %}" class="btn btn-dark">Agendá tu primera cita</a>
+</div>
 {% else %}
-<p class="text-muted">No tenés citas programadas. <a href="#">Agendá una ahora</a>.</p>
+
+<h5 class="mb-3">Próximas</h5>
+{% if futuras %}
+<div class="table-responsive mb-5">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th class="text-muted fw-normal small">FECHA Y HORA</th>
+                <th class="text-muted fw-normal small">SERVICIO</th>
+                <th class="text-muted fw-normal small">MOTOCICLETA</th>
+                <th class="text-muted fw-normal small">ESTADO</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cita in futuras %}
+            <tr>
+                <td>{{ cita.fecha }} · {{ cita.hora|time:"H:i" }}</td>
+                <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+                <td>{{ cita.motocicleta }}</td>
+                <td>
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                </td>
+                <td class="text-end">
+                    <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-link text-decoration-none">Ver detalle</a>
+                    {% if cita.puede_cancelarse %}
+                    <a href="{% url 'citas:reagendar_cita' cita.id %}" class="btn btn-sm btn-outline-dark">Reagendar</a>
+                    <form method="post" action="{% url 'citas:cancelar_cita' cita.id %}" class="d-inline"
+                          onsubmit="return confirm('¿Cancelar la cita #{{ cita.id }}?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted mb-5">No tenés citas próximas. <a href="{% url 'citas:disponibilidad' %}">Agendá una</a>.</p>
+{% endif %}
+
+<h5 class="mb-3">Pasadas</h5>
+{% if pasadas %}
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th class="text-muted fw-normal small">FECHA Y HORA</th>
+                <th class="text-muted fw-normal small">SERVICIO</th>
+                <th class="text-muted fw-normal small">MOTOCICLETA</th>
+                <th class="text-muted fw-normal small">ESTADO</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cita in pasadas %}
+            <tr>
+                <td>{{ cita.fecha }} · {{ cita.hora|time:"H:i" }}</td>
+                <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+                <td>{{ cita.motocicleta }}</td>
+                <td>
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                </td>
+                <td class="text-end">
+                    <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-link text-decoration-none">Ver detalle</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No tenés citas pasadas.</p>
+{% endif %}
+
 {% endif %}
 
 {% endblock %}

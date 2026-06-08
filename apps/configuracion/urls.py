@@ -1,8 +1,11 @@
-﻿from django.urls import path
-from django.shortcuts import render
+"""URLs de la app configuracion."""
+
+from django.urls import path
+
+from . import views
+
 app_name = 'configuracion'
-def horario(request):
-    return render(request, 'configuracion/horario.html')
+
 urlpatterns = [
-    path('horario/', horario, name='horario'),
+    path('horario/', views.horario, name='horario'),
 ]

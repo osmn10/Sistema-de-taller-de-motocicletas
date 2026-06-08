@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{# SCRUM-29: form de edición de cliente. El DUI va disabled, los demás campos se validan en la view. #}
 
 {% block title %}Editar {{ cliente.nombre_completo }} · Taller{% endblock %}
 
@@ -47,6 +48,7 @@
     <div class="row mb-3">
         <label for="telefono" class="col-sm-3 col-form-label">Teléfono</label>
         <div class="col-sm-9">
+            {# data-mask="telefono" → masks.js inserta el guión 0000-0000 automáticamente #}
             <input type="text" id="telefono" name="telefono"
                    class="form-control {% if errores.telefono %}is-invalid{% endif %}"
                    value="{{ datos.telefono }}"

@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{# SCRUM-36: lista de motos del cliente con acciones editar y activar/desactivar. #}
 
 {% block title %}Mis motos · Taller{% endblock %}
 
@@ -38,6 +39,8 @@
                     {% endif %}
                 </td>
                 <td class="text-end">
+                    <a href="{% url 'vehiculos:historial_moto' placa=moto.placa %}"
+                       class="btn btn-sm btn-outline-secondary">Historial</a>
                     <a href="{% url 'vehiculos:moto_editar' placa=moto.placa %}"
                        class="btn btn-sm btn-outline-dark">Editar</a>
                     <form method="post"
