@@ -467,4 +467,36 @@ def cita_admin_detalle(request, cita_id):
 
 @login_required(login_url='usuarios:login')
 def mis_citas_mecanico(request):
-    return render(request, 'citas/mis_citas_mecanico.html')
+    if not request.user.is_mecanico:
+        messages.error(request, 'Solo los mecánicos pueden ver esta sección.')
+        return redirect('core:home')
+
+    dia_str = request.GET.get('dia', '').strip()
+    estado_filtro = request.GET.get('estado', '').strip()
+
+    citas = Cita.objects.select_related('cliente', 'motocicleta').prefetch_related('servicios')
+
+    dia = None
+    if dia_str:
+        try:
+            dia = date.fromisoformat(dia_str)
+        except ValueError:
+            dia = None
+
+    if dia:
+        citas = citas.filter(fecha=dia)
+    else:
+        hoy = date.today()
+        citas = citas.filter(fecha__gte=hoy, fecha__lte=hoy + timedelta(days=6))
+
+    if estado_filtro:
+        citas = citas.filter(estado=estado_filtro)
+
+    citas = citas.order_by('fecha', 'hora')
+
+    return render(request, 'citas/mis_citas_mecanico.html', {
+        'citas': citas,
+        'dia_str': dia_str,
+        'estado_filtro': estado_filtro,
+        'estados': Cita.ESTADOS,
+    })
