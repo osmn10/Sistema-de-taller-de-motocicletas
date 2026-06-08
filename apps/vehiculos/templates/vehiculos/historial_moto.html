@@ -28,7 +28,7 @@
             <td>{{ cita.fecha|date:"j N Y" }} · {{ cita.hora|time:"H:i" }}</td>
             <td>
                 {% for sc in cita.serviciocita_set.all %}
-                    <span class="badge bg-secondary me-1">{{ sc.servicio.nombre }}</span>
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2 me-1">{{ sc.servicio.nombre }}</span>
                 {% empty %}
                     <span class="text-muted">Sin servicios</span>
                 {% endfor %}
