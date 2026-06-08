@@ -374,83 +374,113 @@ def agendar_cita(request):
 @login_required(login_url='usuarios:login')
 def calendario(request):
     """
-    Muestra el calendario semanal de citas para el admin.
-    Permite navegar entre semanas y filtrar por mecánico o estado.
+    Calendario de citas para el admin con tres modos: día, semana y mes (PBI-23).
+    Permite navegar y filtrar por mecánico o estado.
     """
     if not request.user.is_admin:
         messages.error(request, 'Solo el administrador puede ver el calendario.')
         return redirect('core:home')
 
-    from datetime import timedelta, date
+    import calendar as cal
+    from datetime import timedelta, date, datetime
     from apps.usuarios.models import Mecanico
 
-    # Obtener la fecha base (hoy o la que venga por parámetro GET)
+    modo = request.GET.get('modo', 'semana')
+    if modo not in ('dia', 'semana', 'mes'):
+        modo = 'semana'
+
     fecha_str = request.GET.get('fecha', '')
     if fecha_str:
         try:
-            from datetime import datetime
             fecha_base = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
             fecha_base = date.today()
     else:
         fecha_base = date.today()
 
-    # Calcular lunes y domingo de la semana actual
-    # weekday() retorna 0=lunes, 6=domingo
-    lunes = fecha_base - timedelta(days=fecha_base.weekday())
-    domingo = lunes + timedelta(days=6)
-
-    # Calcular lunes de la semana anterior y siguiente (para navegación)
-    lunes_anterior = lunes - timedelta(days=7)
-    lunes_siguiente = lunes + timedelta(days=7)
-
-    # Obtener filtros opcionales
     filtro_mecanico = request.GET.get('mecanico', '')
     filtro_estado = request.GET.get('estado', '')
 
-    # Consultar todas las citas de la semana
-    citas = Cita.objects.filter(
-        fecha__gte=lunes,
-        fecha__lte=domingo,
-    ).select_related('cliente', 'motocicleta', 'mecanico').order_by('fecha', 'hora')
+    def consultar(desde, hasta):
+        citas = Cita.objects.filter(
+            fecha__gte=desde, fecha__lte=hasta,
+        ).select_related('cliente', 'motocicleta', 'mecanico').order_by('fecha', 'hora')
+        if filtro_mecanico:
+            citas = citas.filter(mecanico__dui=filtro_mecanico)
+        if filtro_estado:
+            citas = citas.filter(estado=filtro_estado)
+        return citas
 
-    # Aplicar filtro por mecánico si se seleccionó uno
-    if filtro_mecanico:
-        citas = citas.filter(mecanico__dui=filtro_mecanico)
-
-    # Aplicar filtro por estado si se seleccionó uno
-    if filtro_estado:
-        citas = citas.filter(estado=filtro_estado)
-
-    # Organizar citas por día de la semana para el template
-    # Crear una lista de 7 días con sus citas
-    dias_semana = []
+    hoy = date.today()
     nombres_dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-    for i in range(7):
-        dia = lunes + timedelta(days=i)
-        citas_del_dia = [c for c in citas if c.fecha == dia]
-        dias_semana.append({
-            'nombre': nombres_dias[i],
-            'fecha': dia,
-            'citas': citas_del_dia,
-            'es_hoy': dia == date.today(),
-        })
 
-    # Obtener lista de mecánicos y estados para los filtros
-    mecanicos = Mecanico.objects.filter(activo=True)
-    estados = Cita.ESTADOS
-
-    return render(request, 'citas/calendario.html', {
-        'dias_semana': dias_semana,
-        'lunes': lunes,
-        'domingo': domingo,
-        'lunes_anterior': lunes_anterior,
-        'lunes_siguiente': lunes_siguiente,
-        'mecanicos': mecanicos,
-        'estados': estados,
+    contexto = {
+        'modo': modo,
+        'fecha_base': fecha_base,
+        'mecanicos': Mecanico.objects.filter(activo=True),
+        'estados': Cita.ESTADOS,
         'filtro_mecanico': filtro_mecanico,
         'filtro_estado': filtro_estado,
-    })
+    }
+
+    if modo == 'dia':
+        citas = consultar(fecha_base, fecha_base)
+        contexto.update({
+            'citas_dia': citas,
+            'fecha_anterior': fecha_base - timedelta(days=1),
+            'fecha_siguiente': fecha_base + timedelta(days=1),
+            'es_hoy': fecha_base == hoy,
+        })
+
+    elif modo == 'mes':
+        primero = fecha_base.replace(day=1)
+        ultimo = fecha_base.replace(day=cal.monthrange(fecha_base.year, fecha_base.month)[1])
+        citas = consultar(primero, ultimo)
+        inicio_grilla = primero - timedelta(days=primero.weekday())
+        fin_grilla = ultimo + timedelta(days=6 - ultimo.weekday())
+        semanas = []
+        dia = inicio_grilla
+        while dia <= fin_grilla:
+            fila = []
+            for _ in range(7):
+                fila.append({
+                    'fecha': dia,
+                    'citas': [c for c in citas if c.fecha == dia],
+                    'es_hoy': dia == hoy,
+                    'del_mes': dia.month == fecha_base.month,
+                })
+                dia += timedelta(days=1)
+            semanas.append(fila)
+        contexto.update({
+            'semanas': semanas,
+            'nombres_dias': nombres_dias,
+            'mes_actual': primero,
+            'fecha_anterior': (primero - timedelta(days=1)).replace(day=1),
+            'fecha_siguiente': ultimo + timedelta(days=1),
+        })
+
+    else:  # semana
+        lunes = fecha_base - timedelta(days=fecha_base.weekday())
+        domingo = lunes + timedelta(days=6)
+        citas = consultar(lunes, domingo)
+        dias_semana = []
+        for i in range(7):
+            d = lunes + timedelta(days=i)
+            dias_semana.append({
+                'nombre': nombres_dias[i],
+                'fecha': d,
+                'citas': [c for c in citas if c.fecha == d],
+                'es_hoy': d == hoy,
+            })
+        contexto.update({
+            'dias_semana': dias_semana,
+            'lunes': lunes,
+            'domingo': domingo,
+            'fecha_anterior': lunes - timedelta(days=7),
+            'fecha_siguiente': lunes + timedelta(days=7),
+        })
+
+    return render(request, 'citas/calendario.html', contexto)
 
 
 @login_required(login_url='usuarios:login')
