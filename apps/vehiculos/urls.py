@@ -11,4 +11,5 @@ urlpatterns = [
     path('nueva/', views.moto_crear, name='moto_crear'),
     path('<str:placa>/editar/', views.moto_editar, name='moto_editar'),
     path('<str:placa>/toggle/', views.moto_toggle, name='moto_toggle'),
+    path('<str:placa>/historial/', views.historial_moto, name='historial_moto'),
 ]

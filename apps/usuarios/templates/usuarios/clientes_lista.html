@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{# SCRUM-29: tabla de clientes con buscador (form GET → param ?q=) y link al detalle. #}
 
 {% block title %}Clientes · Taller{% endblock %}
 
@@ -17,6 +18,7 @@
     <div class="col-md-2">
         <button type="submit" class="btn btn-dark w-100">Buscar</button>
     </div>
+    {# botón "Limpiar" solo aparece si hay una búsqueda activa — sino no tiene sentido #}
     {% if q %}
     <div class="col-md-2">
         <a href="{% url 'usuarios:clientes_lista' %}" class="btn btn-outline-secondary w-100">Limpiar</a>

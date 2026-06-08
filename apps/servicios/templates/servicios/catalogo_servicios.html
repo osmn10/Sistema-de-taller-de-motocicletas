@@ -1,0 +1,131 @@
+﻿{% extends "core/base.html" %}
+
+{% block title %}Catálogo de servicios — Taller de Motos{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-control { border-style: dashed; }
+    .form-control.is-invalid { border-style: dashed; }
+</style>
+{% endblock %}
+
+{% block content %}
+<p class="text-muted small mb-1">12 · GESTIÓN DEL CATÁLOGO DE SERVICIOS · ADMIN</p>
+<h2 class="mb-4">Catálogo de servicios</h2>
+
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="?mostrar_form=1" class="btn btn-dark">+ Nuevo servicio</a>
+    <form method="get" class="d-flex gap-2">
+        <input type="text" name="q" class="form-control" placeholder="Buscar por nombre"
+               value="{{ busqueda }}" style="width: 220px; border-style: solid;">
+        <button type="submit" class="btn btn-outline-secondary">Buscar</button>
+        {% if busqueda %}
+            <a href="{% url 'servicios:catalogo' %}" class="btn btn-outline-danger">x</a>
+        {% endif %}
+    </form>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th class="text-muted fw-normal small">NOMBRE</th>
+            <th class="text-muted fw-normal small">PRECIO BASE</th>
+            <th class="text-muted fw-normal small">DURACIÓN EST.</th>
+            <th class="text-muted fw-normal small">ESTADO</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for servicio in servicios %}
+        <tr>
+            <td class="align-middle">{{ servicio.nombre }}</td>
+            <td class="align-middle">${{ servicio.precio_base }}</td>
+            <td class="align-middle">{{ servicio.duracion_display }}</td>
+            <td class="align-middle">
+                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">
+                    {% if servicio.activo %}Activo{% else %}Inactivo{% endif %}
+                </span>
+            </td>
+            <td class="align-middle text-end">
+                <a href="?editar={{ servicio.id }}" class="text-decoration-none me-2">Editar</a>
+                <span class="text-muted">·</span>
+                <form method="post" class="d-inline ms-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="servicio_id" value="{{ servicio.id }}">
+                    {% if servicio.activo %}
+                        <input type="hidden" name="accion" value="desactivar">
+                        <button type="submit" class="btn btn-link text-decoration-none p-0 text-danger">Desactivar</button>
+                    {% else %}
+                        <input type="hidden" name="accion" value="activar">
+                        <button type="submit" class="btn btn-link text-decoration-none p-0 text-success">Activar</button>
+                    {% endif %}
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="text-center text-muted py-4">No hay servicios registrados.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if request.GET.mostrar_form or servicio_editar %}
+<hr class="my-4">
+<p class="text-muted small mb-3">
+    {% if servicio_editar %}EDITAR SERVICIO{% else %}NUEVO SERVICIO (FORMULARIO){% endif %}
+</p>
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="guardar">
+    {% if servicio_editar %}
+        <input type="hidden" name="servicio_id" value="{{ servicio_editar.id }}">
+    {% endif %}
+    <div class="row mb-3 align-items-start">
+        <label for="nombre" class="col-sm-2 col-form-label">Nombre</label>
+        <div class="col-sm-10">
+            <input type="text" id="nombre" name="nombre"
+                   class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+                   placeholder="Nombre del servicio"
+                   value="{% if datos.nombre %}{{ datos.nombre }}{% elif servicio_editar %}{{ servicio_editar.nombre }}{% endif %}">
+            {% if errores.nombre %}<div class="invalid-feedback">{{ errores.nombre }}</div>{% endif %}
+        </div>
+    </div>
+    <div class="row mb-3 align-items-start">
+        <label for="descripcion" class="col-sm-2 col-form-label">Descripción</label>
+        <div class="col-sm-10">
+            <input type="text" id="descripcion" name="descripcion"
+                   class="form-control"
+                   placeholder="Descripción breve"
+                   value="{% if datos.descripcion %}{{ datos.descripcion }}{% elif servicio_editar %}{{ servicio_editar.descripcion }}{% endif %}">
+        </div>
+    </div>
+    <div class="row mb-3 align-items-start">
+        <label for="precio_base" class="col-sm-2 col-form-label">Precio base</label>
+        <div class="col-sm-10">
+            <input type="number" id="precio_base" name="precio_base" step="0.01" min="0"
+                   class="form-control {% if errores.precio_base %}is-invalid{% endif %}"
+                   placeholder="0.00"
+                   value="{% if datos.precio_base %}{{ datos.precio_base }}{% elif servicio_editar %}{{ servicio_editar.precio_base }}{% endif %}">
+            {% if errores.precio_base %}<div class="invalid-feedback">{{ errores.precio_base }}</div>{% endif %}
+        </div>
+    </div>
+    <div class="row mb-3 align-items-start">
+        <label for="duracion_estimada" class="col-sm-2 col-form-label">Duración</label>
+        <div class="col-sm-10">
+            <input type="number" id="duracion_estimada" name="duracion_estimada" min="1"
+                   class="form-control {% if errores.duracion_estimada %}is-invalid{% endif %}"
+                   placeholder="0"
+                   value="{% if datos.duracion_estimada %}{{ datos.duracion_estimada }}{% elif servicio_editar %}{{ servicio_editar.duracion_estimada }}{% endif %}">
+            <div class="form-text">En minutos. Ej: 30 = 30 min, 120 = 2 h</div>
+            {% if errores.duracion_estimada %}<div class="invalid-feedback">{{ errores.duracion_estimada }}</div>{% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'servicios:catalogo' %}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Guardar servicio</button>
+    </div>
+</form>
+{% endif %}
+
+{% endblock %}

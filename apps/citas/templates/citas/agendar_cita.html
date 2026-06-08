@@ -1,13 +1,76 @@
-{% extends 'core/base.html' %}
+{% extends "core/base.html" %}
+{# SCRUM-41: form para confirmar y crear la cita. Se entra desde un slot libre en disponibilidad. #}
 
-{% block title %}Agendar cita · Taller{% endblock %}
+{% block title %}Agendar cita — Taller de Motos{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Agendar nueva cita</h1>
+<p class="text-muted small mb-1">CITAS</p>
+<a href="{% url 'citas:disponibilidad' %}?fecha={{ fecha|date:'Y-m-d' }}&servicio={{ servicio_principal.id }}"
+   class="text-decoration-none text-muted small">‹ Volver a disponibilidad</a>
+<h2 class="mb-4 mt-2">Agendar nueva cita</h2>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
+{# errores.slot aparece si otro cliente agendó este mismo horario mientras este llenaba el form #}
+{% if errores.slot %}
+<div class="alert alert-danger">{{ errores.slot }}</div>
+{% endif %}
+
+{# resumen no editable de lo que ya eligió en disponibilidad: fecha + hora + servicio principal #}
+<div class="card mb-4">
+    <div class="card-body">
+        <p class="text-muted small mb-2">RESUMEN DEL SLOT</p>
+        <p class="mb-1"><strong>Fecha:</strong> {{ fecha }}</p>
+        <p class="mb-1"><strong>Hora:</strong> {{ hora|time:"H:i" }}</p>
+        <p class="mb-0"><strong>Servicio principal:</strong> {{ servicio_principal.nombre }} ({{ servicio_principal.duracion_display }}) — ${{ servicio_principal.precio_base }}</p>
     </div>
 </div>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="mb-3">
+        <label for="motocicleta" class="form-label">Motocicleta</label>
+        <select name="motocicleta" id="motocicleta"
+                class="form-select {% if errores.motocicleta %}is-invalid{% endif %}" required>
+            <option value="">Elegí una de tus motos…</option>
+            {% for m in motos %}
+            <option value="{{ m.placa }}" {% if form_motocicleta == m.placa %}selected{% endif %}>
+                {{ m.placa }} — {{ m.marca }} {{ m.modelo }}
+            </option>
+            {% endfor %}
+        </select>
+        {% if errores.motocicleta %}<div class="invalid-feedback">{{ errores.motocicleta }}</div>{% endif %}
+    </div>
+
+    {# checkboxes: el cliente puede sumar más servicios a la misma cita (M2M Cita-Servicio) #}
+    {% if servicios_adicionales %}
+    <div class="mb-3">
+        <label class="form-label">Servicios adicionales (opcional)</label>
+        <div class="border rounded p-3">
+            {% for s in servicios_adicionales %}
+            <div class="form-check">
+                {# name="servicios_extra" repetido → en la view se lee con request.POST.getlist() #}
+                <input class="form-check-input" type="checkbox"
+                       name="servicios_extra" value="{{ s.id }}" id="servicio_{{ s.id }}"
+                       {% if s.id|stringformat:"s" in form_servicios_extra %}checked{% endif %}>
+                <label class="form-check-label" for="servicio_{{ s.id }}">
+                    {{ s.nombre }} ({{ s.duracion_display }}) — ${{ s.precio_base }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mb-3">
+        <label for="observaciones" class="form-label">Observaciones (opcional)</label>
+        <textarea name="observaciones" id="observaciones" class="form-control" rows="3"
+                  placeholder="Describí el problema o detalles importantes…">{{ form_observaciones }}</textarea>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'citas:disponibilidad' %}?fecha={{ fecha|date:'Y-m-d' }}&servicio={{ servicio_principal.id }}"
+           class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Confirmar cita</button>
+    </div>
+</form>
 {% endblock %}

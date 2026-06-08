@@ -1,13 +1,73 @@
 {% extends 'core/base.html' %}
 
-{% block title %}Mis citas asignadas · Taller{% endblock %}
+{% block title %}Citas del taller — Taller de Motos{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Mis citas asignadas</h1>
+<p class="text-muted small mb-1">CITAS DEL TALLER</p>
+<h2 class="mb-4">Citas programadas</h2>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
+<form method="get" action="{% url 'citas:mis_citas_mecanico' %}" class="row g-3 mb-4">
+    <div class="col-md-4">
+        <label for="dia" class="form-label">Día</label>
+        <input type="date" name="dia" id="dia" class="form-control" value="{{ dia_str }}">
     </div>
+    <div class="col-md-4">
+        <label for="estado" class="form-label">Estado</label>
+        <select name="estado" id="estado" class="form-select">
+            <option value="">Todos los estados</option>
+            {% for valor, etiqueta in estados %}
+            <option value="{{ valor }}" {% if estado_filtro == valor %}selected{% endif %}>{{ etiqueta }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4 d-flex align-items-end gap-2">
+        <button type="submit" class="btn btn-dark">Filtrar</button>
+        {% if dia_str or estado_filtro %}
+        <a href="{% url 'citas:mis_citas_mecanico' %}" class="btn btn-outline-secondary">Limpiar</a>
+        {% endif %}
+    </div>
+</form>
+
+<p class="text-muted small mb-3">
+    {% if dia_str %}Mostrando las citas del {{ dia_str }}.{% else %}Mostrando las citas de hoy y los próximos 7 días.{% endif %}
+</p>
+
+{% if citas %}
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th class="text-muted fw-normal small">FECHA</th>
+                <th class="text-muted fw-normal small">HORA</th>
+                <th class="text-muted fw-normal small">CLIENTE</th>
+                <th class="text-muted fw-normal small">VEHÍCULO</th>
+                <th class="text-muted fw-normal small">SERVICIO</th>
+                <th class="text-muted fw-normal small">ESTADO</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cita in citas %}
+            <tr>
+                <td>{{ cita.fecha }}</td>
+                <td>{{ cita.hora|time:"H:i" }}</td>
+                <td>{{ cita.cliente.nombre_completo }}</td>
+                <td>{{ cita.motocicleta }}</td>
+                <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+                <td>
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
+{% else %}
+<div class="alert alert-light text-center">
+    {% if dia_str or estado_filtro %}
+    No hay citas que coincidan con el filtro.
+    {% else %}
+    No hay citas programadas para hoy ni esta semana.
+    {% endif %}
+</div>
+{% endif %}
 {% endblock %}

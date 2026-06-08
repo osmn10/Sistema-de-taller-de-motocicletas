@@ -1,13 +1,166 @@
-{% extends 'core/base.html' %}
+{% extends "core/base.html" %}
 
-{% block title %}Calendario de citas · Taller{% endblock %}
+{% block title %}Calendario de citas — Taller{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Calendario de citas</h1>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
+<!-- Título de la página -->
+<h2 class="mb-4">Calendario de citas</h2>
+
+<!-- Botones de vista + navegación de semana -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- Botones de vista -->
+    <div class="d-flex gap-1">
+        <span class="btn btn-outline-dark btn-sm rounded-pill disabled">Día</span>
+        <span class="btn btn-dark btn-sm rounded-pill">Semana</span>
+        <span class="btn btn-outline-dark btn-sm rounded-pill disabled">Mes</span>
+    </div>
+
+    <!-- Navegación entre semanas -->
+    <div class="d-flex align-items-center gap-3">
+        <a href="?fecha={{ lunes_anterior|date:'Y-m-d' }}{% if filtro_mecanico %}&mecanico={{ filtro_mecanico }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}"
+           class="text-decoration-none text-dark fs-5">‹</a>
+        <span>
+            Semana {{ lunes|date:'d' }} – {{ domingo|date:'d' }} {{ domingo|date:'F Y' }}
+        </span>
+        <a href="?fecha={{ lunes_siguiente|date:'Y-m-d' }}{% if filtro_mecanico %}&mecanico={{ filtro_mecanico }}{% endif %}{% if filtro_estado %}&estado={{ filtro_estado }}{% endif %}"
+           class="text-decoration-none text-dark fs-5">›</a>
+    </div>
+</div>
+
+<!-- Grilla del calendario semanal -->
+<div class="border rounded" style="display: grid; grid-template-columns: repeat(7, 1fr); min-height: 250px;">
+    {% for dia in dias_semana %}
+    <div class="{% if not forloop.first %}border-start{% endif %} p-2 {% if dia.fecha.weekday == 6 %}text-muted{% endif %}"
+         style="min-height: 250px;">
+
+        <!-- Encabezado del día: nombre + número en la misma línea -->
+        <div class="mb-2">
+            <span class="{% if dia.es_hoy %}fw-bold{% endif %}">
+                {{ dia.nombre }} {{ dia.fecha|date:'d' }}
+            </span>
+        </div>
+
+        <!-- Citas de ese día -->
+        {% for cita in dia.citas %}
+        <a href="{% url 'citas:cita_detalle' cita.id %}" class="text-decoration-none">
+            <div class="bg-light rounded p-1 px-2 mb-1 small text-dark">
+                {{ cita.hora|time:'H:i' }} {{ cita.motocicleta.placa }}
+            </div>
+        </a>
+        {% empty %}
+        {% if dia.fecha.weekday == 6 %}
+        <span class="text-muted small">Cerrado</span>
+        {% endif %}
+        {% endfor %}
+
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Filtros debajo del calendario (como en el mockup) -->
+<div class="d-flex gap-3 mt-4 align-items-center">
+    <form method="get" class="d-flex gap-3 align-items-center">
+        <input type="hidden" name="fecha" value="{{ lunes|date:'Y-m-d' }}">
+
+        <span class="text-muted">Filtros</span>
+
+        <!-- Filtro por mecánico -->
+        <select name="mecanico" class="form-select" style="min-width: 250px;" onchange="this.form.submit()">
+            <option value="">Mecánico ▾</option>
+            {% for mec in mecanicos %}
+            <option value="{{ mec.dui }}" {% if filtro_mecanico == mec.dui %}selected{% endif %}>
+                {{ mec.nombre_completo }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <!-- Filtro por estado -->
+        <select name="estado" class="form-select" style="min-width: 250px;" onchange="this.form.submit()">
+            <option value="">Estado ▾</option>
+            {% for valor, nombre in estados %}
+            <option value="{{ valor }}" {% if filtro_estado == valor %}selected{% endif %}>
+                {{ nombre }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+{% block title %}Calendario de citas — Taller de Motos{% endblock %}
+
+{% block content %}
+<p class="text-muted small mb-1">09 · PANEL ADMIN · CALENDARIO DE CITAS</p>
+<h2 class="mb-4">Calendario de citas</h2>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex gap-2">
+        <a href="?semana={{ semana_offset }}&mecanico={{ mecanico_id }}&estado={{ estado_filtro }}"
+           class="btn btn-outline-secondary btn-sm rounded-pill">Día</a>
+        <a href="?semana={{ semana_offset }}&mecanico={{ mecanico_id }}&estado={{ estado_filtro }}"
+           class="btn btn-dark btn-sm rounded-pill">Semana</a>
+        <a href="?semana={{ semana_offset }}&mecanico={{ mecanico_id }}&estado={{ estado_filtro }}"
+           class="btn btn-outline-secondary btn-sm rounded-pill">Mes</a>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <a href="?semana={{ semana_offset|add:'-1' }}&mecanico={{ mecanico_id }}&estado={{ estado_filtro }}"
+           class="text-decoration-none">‹</a>
+        <span class="small">Semana {{ inicio_semana|date:"j N" }} – {{ fin_semana|date:"j N Y" }}</span>
+        <a href="?semana={{ semana_offset|add:'1' }}&mecanico={{ mecanico_id }}&estado={{ estado_filtro }}"
+           class="text-decoration-none">›</a>
+    </div>
+</div>
+
+<div class="row g-2 mb-4">
+    {% for dia in dias %}
+    <div class="col">
+        <div class="border rounded p-2" style="min-height: 120px; border-style: dashed !important;">
+            <p class="small fw-bold mb-2">
+                {{ dia.fecha|date:"D j" }}
+            </p>
+            {% if dia.citas %}
+                {% for cita in dia.citas %}
+                <a href="{% url 'citas:cita_admin_detalle' cita.id %}"
+                   class="d-block text-decoration-none mb-1">
+                    <span class="badge bg-secondary w-100 text-start">
+                        {{ cita.hora|time:"H:i" }} {{ cita.motocicleta.placa }}
+                    </span>
+                </a>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted small mb-0">—</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row align-items-center">
+    <div class="col-auto">
+        <span class="text-muted">Filtros</span>
+    </div>
+    <div class="col-md-4">
+        <form method="get" class="d-flex gap-2">
+            <input type="hidden" name="semana" value="{{ semana_offset }}">
+            <select name="mecanico" class="form-select" style="border-style: dashed;"
+                    onchange="this.form.submit()">
+                <option value="">Mecánico ▼</option>
+                {% for m in mecanicos %}
+                <option value="{{ m.dui }}" {% if mecanico_id == m.dui %}selected{% endif %}>
+                    {{ m.nombre }} {{ m.apellido }}
+                </option>
+                {% endfor %}
+            </select>
+            <select name="estado" class="form-select" style="border-style: dashed;"
+                    onchange="this.form.submit()">
+                <option value="">Estado ▼</option>
+                {% for valor, etiqueta in estados %}
+                <option value="{{ valor }}" {% if estado_filtro == valor %}selected{% endif %}>
+                    {{ etiqueta }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
     </div>
 </div>
 {% endblock %}
