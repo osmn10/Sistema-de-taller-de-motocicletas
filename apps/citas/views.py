@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from apps.configuracion.models import HorarioTaller
 from apps.servicios.models import Servicio
@@ -16,10 +17,131 @@ from .models import Cita, CambioEstadoCita, ServicioCita
 
 @login_required(login_url='usuarios:login')
 def mis_citas(request):
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden ver sus citas.')
+        return redirect('core:home')
+
+    hoy = date.today()
     citas = Cita.objects.filter(
         cliente=request.user.cliente,
-    ).exclude(estado=Cita.ESTADO_CANCELADA).order_by('-fecha', '-hora')
-    return render(request, 'citas/mis_citas.html', {'citas': citas})
+    ).prefetch_related('servicios').order_by('-fecha', '-hora')
+
+    futuras = [c for c in citas if c.fecha >= hoy]
+    pasadas = [c for c in citas if c.fecha < hoy]
+    futuras.sort(key=lambda c: (c.fecha, c.hora))
+
+    return render(request, 'citas/mis_citas.html', {
+        'futuras': futuras,
+        'pasadas': pasadas,
+    })
+
+
+@login_required(login_url='usuarios:login')
+def reagendar_cita(request, cita_id):
+    """SCRUM-35. Mueve una cita del cliente a otra fecha/hora disponible."""
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden reagendar citas.')
+        return redirect('core:home')
+
+    cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
+
+    if not cita.puede_cancelarse():
+        messages.error(request, 'Esta cita ya no se puede reagendar.')
+        return redirect('citas:mis_citas')
+
+    servicio = cita.servicios.first()
+    if servicio is None:
+        messages.error(request, 'La cita no tiene servicios asociados.')
+        return redirect('citas:mis_citas')
+
+    if request.method == 'POST':
+        fecha_str = request.POST.get('fecha', '').strip()
+        hora_str = request.POST.get('hora', '').strip()
+        try:
+            nueva_fecha = date.fromisoformat(fecha_str)
+            nueva_hora = datetime.strptime(hora_str, '%H:%M').time()
+        except ValueError:
+            messages.error(request, 'Datos inválidos. Elegí un horario de la lista.')
+            return redirect('citas:reagendar_cita', cita_id=cita.id)
+
+        if nueva_fecha < date.today():
+            messages.error(request, 'No podés reagendar a una fecha pasada.')
+            return redirect('citas:reagendar_cita', cita_id=cita.id)
+
+        capacidad = Mecanico.objects.filter(activo=True).count()
+        ocupados = Cita.objects.filter(
+            fecha=nueva_fecha,
+            hora=nueva_hora,
+            estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA],
+        ).exclude(id=cita.id).count()
+        if ocupados >= capacidad:
+            messages.error(request, 'Ese horario se acaba de llenar. Elegí otro.')
+            url = reverse('citas:reagendar_cita', args=[cita.id])
+            return redirect(f'{url}?fecha={nueva_fecha.isoformat()}')
+
+        cita.fecha = nueva_fecha
+        cita.hora = nueva_hora
+        cita.save()
+        messages.success(
+            request,
+            f'Cita #{cita.id} reagendada para el {nueva_fecha} a las {nueva_hora.strftime("%H:%M")}.',
+        )
+        return redirect('citas:mis_citas')
+
+    fecha_str = request.GET.get('fecha', '').strip()
+    contexto = {
+        'cita': cita,
+        'servicio': servicio,
+        'hoy': date.today().isoformat(),
+        'fecha_str': fecha_str,
+    }
+
+    if not fecha_str:
+        return render(request, 'citas/reagendar_cita.html', contexto)
+
+    try:
+        fecha = date.fromisoformat(fecha_str)
+    except ValueError:
+        contexto['error'] = 'Fecha inválida.'
+        return render(request, 'citas/reagendar_cita.html', contexto)
+
+    if fecha < date.today():
+        contexto['error'] = 'No se pueden consultar fechas pasadas.'
+        return render(request, 'citas/reagendar_cita.html', contexto)
+
+    horario = HorarioTaller.objects.filter(dia_semana=fecha.weekday()).first()
+    if not horario or not horario.abierto or not horario.hora_apertura or not horario.hora_cierre:
+        contexto['mensaje'] = 'El taller no atiende ese día. Elegí otra fecha.'
+        contexto['fecha'] = fecha
+        return render(request, 'citas/reagendar_cita.html', contexto)
+
+    capacidad = Mecanico.objects.filter(activo=True).count()
+    if capacidad == 0:
+        contexto['error'] = 'No hay mecánicos disponibles. Contactá al administrador.'
+        contexto['fecha'] = fecha
+        return render(request, 'citas/reagendar_cita.html', contexto)
+
+    duracion = timedelta(minutes=servicio.duracion_estimada)
+    inicio = datetime.combine(fecha, horario.hora_apertura)
+    fin = datetime.combine(fecha, horario.hora_cierre)
+
+    slots = []
+    actual = inicio
+    while actual + duracion <= fin:
+        hora_slot = actual.time()
+        ocupados = Cita.objects.filter(
+            fecha=fecha,
+            hora=hora_slot,
+            estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA],
+        ).exclude(id=cita.id).count()
+        slots.append({
+            'hora': hora_slot,
+            'libre': ocupados < capacidad,
+        })
+        actual += duracion
+
+    contexto.update({'fecha': fecha, 'slots': slots})
+    return render(request, 'citas/reagendar_cita.html', contexto)
 
 
 @login_required(login_url='usuarios:login')
