@@ -516,6 +516,15 @@ def cita_admin_detalle(request, cita_id):
             if mecanico_dui:
                 try:
                     mecanico = Mecanico.objects.get(dui=mecanico_dui, activo=True)
+                    conflicto = Cita.objects.filter(
+                        mecanico=mecanico,
+                        fecha=cita.fecha,
+                        hora=cita.hora,
+                        estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA, Cita.ESTADO_EN_PROCESO],
+                    ).exclude(id=cita.id).exists()
+                    if conflicto:
+                        messages.error(request, f'{mecanico.nombre} {mecanico.apellido} ya tiene otra cita el {cita.fecha} a las {cita.hora.strftime("%H:%M")}.')
+                        return redirect('citas:cita_admin_detalle', cita_id=cita.id)
                     cita.mecanico = mecanico
                     cita.save()
                     messages.success(request, f'Mecánico asignado: {mecanico.nombre} {mecanico.apellido}.')
@@ -549,7 +558,7 @@ def cita_admin_detalle(request, cita_id):
             cita.estado = nuevo_estado
             cita.save()
             messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
-            return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+            return redirect('citas:calendario')
 
         else:
             messages.error(request, 'Acción no reconocida.')
