@@ -76,8 +76,8 @@
 
             <!-- Botones de acción -->
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-dark">Guardar producto</button>
                 <button type="button" class="btn btn-outline-dark" data-bs-toggle="collapse" data-bs-target="#formNuevo">Cancelar</button>
+                <button type="submit" class="btn btn-dark">Guardar producto</button>
             </div>
         </form>
     </div>
@@ -109,12 +109,12 @@
             <td class="align-middle">${{ producto.precio }}</td>
             <td class="align-middle">{{ producto.proveedor|default:"—" }}</td>
             <td class="align-middle text-end">
-                <!-- Link para editar el producto -->
-                <a href="{% url 'productos:editar_producto' producto.id %}" class="text-decoration-none">Editar</a>
+                <!-- Botón para editar el producto -->
+                <a href="{% url 'productos:editar_producto' producto.id %}" class="btn btn-sm btn-outline-dark me-1">Editar</a>
                 <!-- Formulario para desactivar el producto -->
-                <form method="post" action="{% url 'productos:desactivar_producto' producto.id %}" class="d-inline ms-2">
+                <form method="post" action="{% url 'productos:desactivar_producto' producto.id %}" class="d-inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-link text-decoration-none p-0"
+                    <button type="submit" class="btn btn-sm btn-outline-dark"
                             onclick="return confirm('¿Desactivar este producto?')">Desactivar</button>
                 </form>
             </td>

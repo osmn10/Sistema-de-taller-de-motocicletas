@@ -1,5 +1,7 @@
 """Vistas de la app usuarios."""
+
 import re
+
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -122,6 +124,7 @@ def mi_perfil(request):
     El DUI no se puede cambiar (es la llave primaria).
     Opcionalmente puede cambiar su contraseña.
     """
+    # Obtener el usuario logueado
     user = request.user
 
     if request.method == 'POST':
@@ -129,9 +132,11 @@ def mi_perfil(request):
         apellido = request.POST.get('apellido', '').strip()
         telefono = request.POST.get('telefono', '').strip()
         email = request.POST.get('email', '').strip()
+        # Campos de contraseña (opcionales)
         password_actual = request.POST.get('password_actual', '').strip()
         password_nueva = request.POST.get('password_nueva', '').strip()
 
+        # Diccionario para acumular errores
         errores = {}
 
         if not nombre:
@@ -141,6 +146,7 @@ def mi_perfil(request):
         if not telefono:
             errores['telefono'] = 'El teléfono es obligatorio.'
         else:
+            # Validar formato del teléfono usando el validador del modelo
             try:
                 telefono_validator(telefono)
             except Exception:
@@ -150,24 +156,29 @@ def mi_perfil(request):
         elif not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
             errores['email'] = 'Correo electrónico inválido.'
 
+        # Validar que el email no esté en uso por otro usuario
         if email and email != user.email:
             if Cliente.objects.filter(email=email).exclude(dui=user.dui).exists():
                 errores['email'] = 'Este correo ya está en uso por otro usuario.'
 
+        # Validar contraseña (solo si el usuario quiere cambiarla)
         if password_actual or password_nueva:
             if not password_actual:
                 errores['password_actual'] = 'Debés ingresar tu contraseña actual.'
             elif not password_nueva:
                 errores['password_nueva'] = 'Debés ingresar la nueva contraseña.'
             elif not user.check_password(password_actual):
+                # Verificar que la contraseña actual sea correcta
                 errores['password_actual'] = 'La contraseña actual es incorrecta.'
             elif len(password_nueva) < 8:
                 errores['password_nueva'] = 'La nueva contraseña debe tener al menos 8 caracteres.'
 
+        # Obtener dirección si es cliente
         direccion = ''
         if user.is_cliente:
             direccion = request.POST.get('direccion', '').strip()
 
+        # Si hay errores, volver a mostrar el formulario
         if errores:
             return render(request, 'usuarios/mi_perfil.html', {
                 'errores': errores,
@@ -178,6 +189,7 @@ def mi_perfil(request):
                 'form_direccion': direccion,
             })
 
+        # Guardar los cambios según el tipo de usuario
         if user.is_cliente:
             cliente = user.cliente
             cliente.nombre = nombre
@@ -187,12 +199,14 @@ def mi_perfil(request):
             cliente.direccion = direccion
             cliente.save()
         else:
+            # Si no es cliente (mecánico o admin), guardar en usuario directamente
             user.nombre = nombre
             user.apellido = apellido
             user.telefono = telefono
             user.email = email
             user.save()
 
+        # Si quiere cambiar contraseña, actualizarla
         if password_actual and password_nueva:
             user.set_password(password_nueva)
             user.save()
@@ -202,6 +216,7 @@ def mi_perfil(request):
         messages.success(request, 'Perfil actualizado correctamente.')
         return redirect('usuarios:mi_perfil')
 
+    # GET: mostrar formulario con datos actuales del usuario
     direccion = ''
     if user.is_cliente:
         direccion = user.cliente.direccion

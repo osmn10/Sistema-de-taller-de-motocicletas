@@ -64,7 +64,7 @@
         <p class="mb-4">{{ cita.observaciones }}</p>
         {% endif %}
 
-        {% if estados_posibles %}
+        {% if opciones_estado %}
         <hr class="my-4">
         <p class="text-muted small mb-3">CAMBIAR ESTADO</p>
         <form method="post">
@@ -75,8 +75,8 @@
                 <div class="col-sm-9">
                     <select name="nuevo_estado" class="form-select" style="border-style: dashed;" required>
                         <option value="">Seleccioná un estado</option>
-                        {% for estado in estados_posibles %}
-                        <option value="{{ estado }}">{{ estados_display|dict_get:estado }}</option>
+                        {% for codigo, etiqueta in opciones_estado %}
+                        <option value="{{ codigo }}">{{ etiqueta }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -90,7 +90,7 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <a href="{% url 'citas:calendario' %}" class="btn btn-outline-secondary">Cancelar</a>
+                <a href="{% url 'citas:calendario' %}" class="btn btn-outline-dark">Cancelar</a>
                 <button type="submit" class="btn btn-dark">Guardar cambio</button>
             </div>
         </form>

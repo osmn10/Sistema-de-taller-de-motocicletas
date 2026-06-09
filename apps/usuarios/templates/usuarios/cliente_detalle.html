@@ -12,9 +12,9 @@
     <div>
         <h1 class="h3 mb-1">{{ cliente.nombre_completo }}</h1>
         {% if cliente.activo %}
-            <span class="badge bg-success">Activo</span>
+            <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activo</span>
         {% else %}
-            <span class="badge bg-secondary">Inactivo</span>
+            <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactivo</span>
         {% endif %}
     </div>
     <div class="d-flex gap-2">
@@ -22,12 +22,12 @@
         <form method="post" action="{% url 'usuarios:cliente_toggle' dui=cliente.dui %}" class="d-inline">
             {% csrf_token %}
             {% if cliente.activo %}
-                <button type="submit" class="btn btn-outline-danger"
+                <button type="submit" class="btn btn-outline-dark"
                         onclick="return confirm('¿Desactivar a este cliente?');">
                     Desactivar
                 </button>
             {% else %}
-                <button type="submit" class="btn btn-outline-success">
+                <button type="submit" class="btn btn-outline-dark">
                     Activar
                 </button>
             {% endif %}
@@ -94,9 +94,9 @@
                         <td>{{ moto.kilometraje }} km</td>
                         <td>
                             {% if moto.activo %}
-                                <span class="badge bg-success">Activa</span>
+                                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activa</span>
                             {% else %}
-                                <span class="badge bg-secondary">Inactiva</span>
+                                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactiva</span>
                             {% endif %}
                         </td>
                     </tr>

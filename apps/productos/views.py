@@ -14,6 +14,10 @@ def inventario(request):
     Permite buscar por nombre o proveedor.
     Muestra alerta si hay productos con stock bajo.
     """
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
     # Obtener el término de búsqueda del parámetro GET (si existe)
     busqueda = request.GET.get('q', '').strip()
 
@@ -49,6 +53,10 @@ def crear_producto(request):
     Crea un nuevo producto en el inventario.
     Recibe los datos del formulario por POST.
     """
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para realizar esta acción.')
+        return redirect('core:home')
+
     if request.method == 'POST':
         # Obtener datos del formulario
         nombre = request.POST.get('nombre', '').strip()
@@ -147,6 +155,10 @@ def editar_producto(request, producto_id):
     GET: muestra el formulario con los datos actuales.
     POST: guarda los cambios.
     """
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para realizar esta acción.')
+        return redirect('core:home')
+
     # Obtener el producto o mostrar error 404
     producto = get_object_or_404(Producto, id=producto_id)
 
@@ -242,6 +254,10 @@ def desactivar_producto(request, producto_id):
     Desactiva un producto (soft delete).
     No se elimina de la BD, solo se marca como inactivo.
     """
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para realizar esta acción.')
+        return redirect('core:home')
+
     producto = get_object_or_404(Producto, id=producto_id)
 
     if request.method == 'POST':
