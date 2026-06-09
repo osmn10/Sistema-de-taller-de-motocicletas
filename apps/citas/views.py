@@ -300,6 +300,7 @@ def cita_admin_detalle(request, cita_id):
     cita = get_object_or_404(Cita, id=cita_id)
     servicios = cita.serviciocita_set.select_related('servicio').all()
     cambios = cita.cambios_estado.select_related('realizado_por').all()
+    mecanicos = Mecanico.objects.filter(activo=True).order_by('apellido', 'nombre')
 
     TRANSICIONES = {
         Cita.ESTADO_PENDIENTE:  [Cita.ESTADO_CONFIRMADA, Cita.ESTADO_CANCELADA],
@@ -309,30 +310,57 @@ def cita_admin_detalle(request, cita_id):
         Cita.ESTADO_CANCELADA:  [],
     }
     estados_posibles = TRANSICIONES.get(cita.estado, [])
+    puede_asignar_mecanico = cita.estado not in [Cita.ESTADO_COMPLETADA, Cita.ESTADO_CANCELADA]
 
     if request.method == 'POST':
-        nuevo_estado = request.POST.get('nuevo_estado', '').strip()
-        motivo = request.POST.get('motivo', '').strip()
+        accion = request.POST.get('accion', '').strip()
 
-        if nuevo_estado not in estados_posibles:
-            messages.error(request, 'Transición de estado no válida.')
+        if accion == 'asignar_mecanico':
+            if not puede_asignar_mecanico:
+                messages.error(request, 'No se puede asignar mecánico a esta cita.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+            mecanico_dui = request.POST.get('mecanico_dui', '').strip()
+            if mecanico_dui:
+                try:
+                    mecanico = Mecanico.objects.get(dui=mecanico_dui, activo=True)
+                    cita.mecanico = mecanico
+                    cita.save()
+                    messages.success(request, f'Mecánico asignado: {mecanico.nombre} {mecanico.apellido}.')
+                except Mecanico.DoesNotExist:
+                    messages.error(request, 'Mecánico no válido.')
+            else:
+                cita.mecanico = None
+                cita.save()
+                messages.success(request, 'Mecánico removido de la cita.')
             return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
-        if nuevo_estado == Cita.ESTADO_CANCELADA and not motivo:
-            messages.error(request, 'El motivo es obligatorio para cancelar.')
+        elif accion == 'cambiar_estado':
+            nuevo_estado = request.POST.get('nuevo_estado', '').strip()
+            motivo = request.POST.get('motivo', '').strip()
+
+            if nuevo_estado not in estados_posibles:
+                messages.error(request, 'Transición de estado no válida.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            if nuevo_estado == Cita.ESTADO_CANCELADA and not motivo:
+                messages.error(request, 'El motivo es obligatorio para cancelar.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            CambioEstadoCita.objects.create(
+                cita=cita,
+                estado_anterior=cita.estado,
+                estado_nuevo=nuevo_estado,
+                motivo=motivo,
+                realizado_por=request.user,
+            )
+            cita.estado = nuevo_estado
+            cita.save()
+            messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
             return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
-        CambioEstadoCita.objects.create(
-            cita=cita,
-            estado_anterior=cita.estado,
-            estado_nuevo=nuevo_estado,
-            motivo=motivo,
-            realizado_por=request.user,
-        )
-        cita.estado = nuevo_estado
-        cita.save()
-        messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
-        return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+        else:
+            messages.error(request, 'Acción no reconocida.')
+            return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
     return render(request, 'citas/cita_admin_detalle.html', {
         'cita': cita,
@@ -340,6 +368,8 @@ def cita_admin_detalle(request, cita_id):
         'cambios': cambios,
         'estados_posibles': estados_posibles,
         'estados_display': dict(Cita.ESTADOS),
+        'mecanicos': mecanicos,
+        'puede_asignar_mecanico': puede_asignar_mecanico,
     })
 
 
