@@ -1,0 +1,21 @@
+{% extends "emails/base.html" %}
+
+{% block titulo %}Cita #{{ cita.id }} confirmada{% endblock %}
+{% block preencabezado %}Tu cita fue confirmada para el {{ cita.fecha }}.{% endblock %}
+
+{% block contenido %}
+<h1 style="font-size:26px; margin:0 0 16px; color:#18181b;">Cita confirmada</h1>
+<p style="margin:0 0 20px;">Hola, <strong>{{ cita.cliente.nombre_completo }}</strong>. Confirmamos tu cita <strong>#{{ cita.id }}</strong>.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin-bottom:20px;">
+    <tr><td style="padding:10px 0; border-bottom:1px solid #e4e4e7; color:#71717a;">Fecha</td><td align="right" style="padding:10px 0; border-bottom:1px solid #e4e4e7;"><strong>{{ cita.fecha|date:"d/m/Y" }}</strong></td></tr>
+    <tr><td style="padding:10px 0; border-bottom:1px solid #e4e4e7; color:#71717a;">Hora</td><td align="right" style="padding:10px 0; border-bottom:1px solid #e4e4e7;"><strong>{{ cita.hora|time:"H:i" }}</strong></td></tr>
+    <tr><td style="padding:10px 0; border-bottom:1px solid #e4e4e7; color:#71717a;">Motocicleta</td><td align="right" style="padding:10px 0; border-bottom:1px solid #e4e4e7;"><strong>{{ cita.motocicleta }}</strong></td></tr>
+    <tr><td style="padding:10px 0; border-bottom:1px solid #e4e4e7; color:#71717a;">Mecánico</td><td align="right" style="padding:10px 0; border-bottom:1px solid #e4e4e7;"><strong>{% if cita.mecanico %}{{ cita.mecanico.nombre_completo }}{% else %}Por asignar{% endif %}</strong></td></tr>
+    {% if taller_direccion %}<tr><td style="padding:10px 0; border-bottom:1px solid #e4e4e7; color:#71717a;">Dirección</td><td align="right" style="padding:10px 0; border-bottom:1px solid #e4e4e7;"><strong>{{ taller_direccion }}</strong></td></tr>{% endif %}
+</table>
+<h2 style="font-size:17px; margin:0 0 10px;">Servicios</h2>
+<ul style="margin:0 0 20px; padding-left:20px;">
+    {% for detalle in servicios %}<li style="margin-bottom:6px;">{{ detalle.servicio.nombre }}</li>{% endfor %}
+</ul>
+<p style="margin:0; color:#52525b;">Te recomendamos presentarte unos minutos antes de la hora indicada.</p>
+{% endblock %}
