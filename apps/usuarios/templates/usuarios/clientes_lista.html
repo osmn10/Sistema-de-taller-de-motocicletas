@@ -21,7 +21,7 @@
     {# botón "Limpiar" solo aparece si hay una búsqueda activa — sino no tiene sentido #}
     {% if q %}
     <div class="col-md-2">
-        <a href="{% url 'usuarios:clientes_lista' %}" class="btn btn-outline-secondary w-100">Limpiar</a>
+        <a href="{% url 'usuarios:clientes_lista' %}" class="btn btn-outline-dark w-100">Limpiar</a>
     </div>
     {% endif %}
 </form>
@@ -48,9 +48,9 @@
                 <td>{{ cliente.telefono }}</td>
                 <td>
                     {% if cliente.activo %}
-                        <span class="badge bg-success">Activo</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activo</span>
                     {% else %}
-                        <span class="badge bg-secondary">Inactivo</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactivo</span>
                     {% endif %}
                 </td>
                 <td class="text-end">

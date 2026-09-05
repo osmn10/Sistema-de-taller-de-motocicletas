@@ -25,13 +25,28 @@
         <p class="mb-4">{{ cita.motocicleta }}</p>
 
         <p class="text-muted small mb-1">MECÁNICO ASIGNADO</p>
-        <p class="mb-4">
+        <div class="mb-4">
             {% if cita.mecanico %}
-                {{ cita.mecanico.nombre }} {{ cita.mecanico.apellido }}
+                <p class="mb-2">{{ cita.mecanico.nombre }} {{ cita.mecanico.apellido }}</p>
             {% else %}
-                <span class="text-muted">Sin asignar</span>
+                <p class="text-muted mb-2">Sin asignar</p>
             {% endif %}
-        </p>
+            {% if puede_asignar_mecanico %}
+            <form method="post" class="d-flex gap-2 align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="asignar_mecanico">
+                <select name="mecanico_dui" class="form-select form-select-sm" style="border-style: dashed; max-width: 260px;">
+                    <option value="">— Sin mecánico —</option>
+                    {% for m in mecanicos %}
+                    <option value="{{ m.dui }}" {% if cita.mecanico.dui == m.dui %}selected{% endif %}>
+                        {{ m.nombre }} {{ m.apellido }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-dark">Asignar</button>
+            </form>
+            {% endif %}
+        </div>
 
         <p class="text-muted small mb-1">SERVICIOS SOLICITADOS</p>
         <div class="mb-4">
@@ -49,18 +64,19 @@
         <p class="mb-4">{{ cita.observaciones }}</p>
         {% endif %}
 
-        {% if estados_posibles %}
+        {% if opciones_estado %}
         <hr class="my-4">
         <p class="text-muted small mb-3">CAMBIAR ESTADO</p>
         <form method="post">
             {% csrf_token %}
+            <input type="hidden" name="accion" value="cambiar_estado">
             <div class="row mb-3 align-items-start">
                 <label class="col-sm-3 col-form-label">Nuevo estado</label>
                 <div class="col-sm-9">
                     <select name="nuevo_estado" class="form-select" style="border-style: dashed;" required>
                         <option value="">Seleccioná un estado</option>
-                        {% for estado in estados_posibles %}
-                        <option value="{{ estado }}">{{ estados_display|dict_get:estado }}</option>
+                        {% for codigo, etiqueta in opciones_estado %}
+                        <option value="{{ codigo }}">{{ etiqueta }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -74,7 +90,7 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <a href="{% url 'citas:calendario' %}" class="btn btn-outline-secondary">Cancelar</a>
+                <a href="{% url 'citas:calendario' %}" class="btn btn-outline-dark">Cancelar</a>
                 <button type="submit" class="btn btn-dark">Guardar cambio</button>
             </div>
         </form>

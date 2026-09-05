@@ -25,7 +25,7 @@
     </div>
     {% if rol_filtro or estado_filtro %}
     <div class="col-auto">
-        <a href="{% url 'usuarios:usuarios_lista' %}" class="btn btn-outline-secondary">Limpiar</a>
+        <a href="{% url 'usuarios:usuarios_lista' %}" class="btn btn-outline-dark">Limpiar</a>
     </div>
     {% endif %}
     <div class="col-auto ms-auto d-flex align-items-center">
@@ -54,16 +54,16 @@
                 <td>{{ u.email }}</td>
                 <td>
                     {% if u.is_admin %}
-                        <span class="badge bg-dark">Administrador</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Administrador</span>
                     {% else %}
-                        <span class="badge bg-secondary">Mecánico</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Mecánico</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if u.activo %}
-                        <span class="badge bg-success">Activo</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activo</span>
                     {% else %}
-                        <span class="badge bg-secondary">Inactivo</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactivo</span>
                     {% endif %}
                 </td>
                 <td class="text-end">
@@ -75,9 +75,9 @@
                           onsubmit="return confirm('¿Confirmar cambio de estado de {{ u.nombre_completo }}?')">
                         {% csrf_token %}
                         {% if u.activo %}
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Desactivar</button>
+                            <button type="submit" class="btn btn-sm btn-outline-dark">Desactivar</button>
                         {% else %}
-                            <button type="submit" class="btn btn-sm btn-outline-success">Activar</button>
+                            <button type="submit" class="btn btn-sm btn-outline-dark">Activar</button>
                         {% endif %}
                     </form>
                 </td>

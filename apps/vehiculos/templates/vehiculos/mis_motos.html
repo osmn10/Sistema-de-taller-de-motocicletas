@@ -33,14 +33,14 @@
                 <td>{{ moto.kilometraje }} km</td>
                 <td>
                     {% if moto.activo %}
-                        <span class="badge bg-success">Activa</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activa</span>
                     {% else %}
-                        <span class="badge bg-secondary">Inactiva</span>
+                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactiva</span>
                     {% endif %}
                 </td>
                 <td class="text-end">
                     <a href="{% url 'vehiculos:historial_moto' placa=moto.placa %}"
-                       class="btn btn-sm btn-outline-secondary">Historial</a>
+                       class="btn btn-sm btn-outline-dark">Historial</a>
                     <a href="{% url 'vehiculos:moto_editar' placa=moto.placa %}"
                        class="btn btn-sm btn-outline-dark">Editar</a>
                     <form method="post"
@@ -48,12 +48,12 @@
                           class="d-inline">
                         {% csrf_token %}
                         {% if moto.activo %}
-                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                            <button type="submit" class="btn btn-sm btn-outline-dark"
                                     onclick="return confirm('¿Desactivar la moto {{ moto.placa }}?');">
                                 Desactivar
                             </button>
                         {% else %}
-                            <button type="submit" class="btn btn-sm btn-outline-success">
+                            <button type="submit" class="btn btn-sm btn-outline-dark">
                                 Activar
                             </button>
                         {% endif %}

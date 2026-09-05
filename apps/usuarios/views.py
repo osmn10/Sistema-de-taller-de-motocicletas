@@ -128,10 +128,6 @@ def mi_perfil(request):
     user = request.user
 
     if request.method == 'POST':
-        # Obtener datos del formulario
-    user = request.user
-
-    if request.method == 'POST':
         nombre = request.POST.get('nombre', '').strip()
         apellido = request.POST.get('apellido', '').strip()
         telefono = request.POST.get('telefono', '').strip()
@@ -141,12 +137,6 @@ def mi_perfil(request):
         password_nueva = request.POST.get('password_nueva', '').strip()
 
         # Diccionario para acumular errores
-        errores = {}
-
-        # Validar campos obligatorios
-        password_actual = request.POST.get('password_actual', '').strip()
-        password_nueva = request.POST.get('password_nueva', '').strip()
-
         errores = {}
 
         if not nombre:
@@ -199,10 +189,7 @@ def mi_perfil(request):
                 'form_direccion': direccion,
             })
 
-    # Guardar los cambios según el tipo de usuario
-        if user.is_cliente:
-            # Si es cliente, actualizar TODO en el objeto cliente
-            # (porque cliente hereda de usuario y tiene todos los campos)
+        # Guardar los cambios según el tipo de usuario
         if user.is_cliente:
             cliente = user.cliente
             cliente.nombre = nombre
@@ -220,11 +207,6 @@ def mi_perfil(request):
             user.save()
 
         # Si quiere cambiar contraseña, actualizarla
-        if password_actual and password_nueva:
-            # set_password hashea la contraseña antes de guardarla
-            user.set_password(password_nueva)
-            user.save()
-            # Re-autenticar para que no se cierre la sesión al cambiar contraseña
         if password_actual and password_nueva:
             user.set_password(password_nueva)
             user.save()

@@ -10,6 +10,9 @@ from .models import Servicio
 @login_required(login_url='usuarios:login')
 def catalogo_servicios(request):
     """Lista, crea y edita servicios del catálogo (SCRUM-39)."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
 
     busqueda = request.GET.get('q', '').strip()
     servicios = Servicio.objects.all()

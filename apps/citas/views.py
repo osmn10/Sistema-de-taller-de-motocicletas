@@ -26,13 +26,12 @@ def mis_citas(request):
         cliente=request.user.cliente,
     ).prefetch_related('servicios').order_by('-fecha', '-hora')
 
-    futuras = [c for c in citas if c.fecha >= hoy]
-    pasadas = [c for c in citas if c.fecha < hoy]
-    futuras.sort(key=lambda c: (c.fecha, c.hora))
+    activas = [c for c in citas if c.estado != Cita.ESTADO_CANCELADA]
+    canceladas = [c for c in citas if c.estado == Cita.ESTADO_CANCELADA]
 
     return render(request, 'citas/mis_citas.html', {
-        'futuras': futuras,
-        'pasadas': pasadas,
+        'activas': activas,
+        'canceladas': canceladas,
     })
 
 
@@ -146,6 +145,9 @@ def reagendar_cita(request, cita_id):
 
 @login_required(login_url='usuarios:login')
 def cita_detalle(request, cita_id):
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden ver el detalle de sus citas.')
+        return redirect('core:home')
     cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
     servicios = cita.serviciocita_set.select_related('servicio').all()
     return render(request, 'citas/cita_detalle.html', {
@@ -156,6 +158,9 @@ def cita_detalle(request, cita_id):
 
 @login_required(login_url='usuarios:login')
 def cancelar_cita(request, cita_id):
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden cancelar sus citas.')
+        return redirect('core:home')
     cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
     if request.method == 'POST':
         if cita.puede_cancelarse():
@@ -369,120 +374,113 @@ def agendar_cita(request):
 @login_required(login_url='usuarios:login')
 def calendario(request):
     """
-    Muestra el calendario semanal de citas para el admin.
-    Permite navegar entre semanas y filtrar por mecánico o estado.
+    Calendario de citas para el admin con tres modos: día, semana y mes (PBI-23).
+    Permite navegar y filtrar por mecánico o estado.
     """
-    from datetime import timedelta, date
+    if not request.user.is_admin:
+        messages.error(request, 'Solo el administrador puede ver el calendario.')
+        return redirect('core:home')
+
+    import calendar as cal
+    from datetime import timedelta, date, datetime
     from apps.usuarios.models import Mecanico
 
-    # Obtener la fecha base (hoy o la que venga por parámetro GET)
+    modo = request.GET.get('modo', 'semana')
+    if modo not in ('dia', 'semana', 'mes'):
+        modo = 'semana'
+
     fecha_str = request.GET.get('fecha', '')
     if fecha_str:
         try:
-            from datetime import datetime
             fecha_base = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
             fecha_base = date.today()
     else:
         fecha_base = date.today()
 
-    # Calcular lunes y domingo de la semana actual
-    # weekday() retorna 0=lunes, 6=domingo
-    lunes = fecha_base - timedelta(days=fecha_base.weekday())
-    domingo = lunes + timedelta(days=6)
-
-    # Calcular lunes de la semana anterior y siguiente (para navegación)
-    lunes_anterior = lunes - timedelta(days=7)
-    lunes_siguiente = lunes + timedelta(days=7)
-
-    # Obtener filtros opcionales
     filtro_mecanico = request.GET.get('mecanico', '')
     filtro_estado = request.GET.get('estado', '')
 
-    # Consultar todas las citas de la semana
-    citas = Cita.objects.filter(
-        fecha__gte=lunes,
-        fecha__lte=domingo,
-    ).select_related('cliente', 'motocicleta', 'mecanico').order_by('fecha', 'hora')
-
-    # Aplicar filtro por mecánico si se seleccionó uno
-    if filtro_mecanico:
-        citas = citas.filter(mecanico__dui=filtro_mecanico)
-
-    # Aplicar filtro por estado si se seleccionó uno
-    if filtro_estado:
-        citas = citas.filter(estado=filtro_estado)
-
-    # Organizar citas por día de la semana para el template
-    # Crear una lista de 7 días con sus citas
-    dias_semana = []
-    nombres_dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-    for i in range(7):
-        dia = lunes + timedelta(days=i)
-        citas_del_dia = [c for c in citas if c.fecha == dia]
-        dias_semana.append({
-            'nombre': nombres_dias[i],
-            'fecha': dia,
-            'citas': citas_del_dia,
-            'es_hoy': dia == date.today(),
-        })
-
-    # Obtener lista de mecánicos y estados para los filtros
-    mecanicos = Mecanico.objects.filter(activo=True)
-    estados = Cita.ESTADOS
-
-    return render(request, 'citas/calendario.html', {
-        'dias_semana': dias_semana,
-        'lunes': lunes,
-        'domingo': domingo,
-        'lunes_anterior': lunes_anterior,
-        'lunes_siguiente': lunes_siguiente,
-        'mecanicos': mecanicos,
-        'estados': estados,
-        'filtro_mecanico': filtro_mecanico,
-        'filtro_estado': filtro_estado,
-    """SCRUM-40. Calendario de citas para el admin con filtros."""
-    if not request.user.is_admin:
-        messages.error(request, 'Solo el administrador puede ver el calendario.')
-        return redirect('core:home')
+    def consultar(desde, hasta):
+        citas = Cita.objects.filter(
+            fecha__gte=desde, fecha__lte=hasta,
+        ).select_related('cliente', 'motocicleta', 'mecanico').order_by('fecha', 'hora')
+        if filtro_mecanico:
+            citas = citas.filter(mecanico__dui=filtro_mecanico)
+        if filtro_estado:
+            citas = citas.filter(estado=filtro_estado)
+        return citas
 
     hoy = date.today()
-    semana_offset = int(request.GET.get('semana', 0))
-    inicio_semana = hoy - timedelta(days=hoy.weekday()) + timedelta(weeks=semana_offset)
-    fin_semana = inicio_semana + timedelta(days=6)
+    nombres_dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
-    mecanico_id = request.GET.get('mecanico', '')
-    estado_filtro = request.GET.get('estado', '')
+    contexto = {
+        'modo': modo,
+        'fecha_base': fecha_base,
+        'mecanicos': Mecanico.objects.filter(activo=True),
+        'estados': Cita.ESTADOS,
+        'filtro_mecanico': filtro_mecanico,
+        'filtro_estado': filtro_estado,
+    }
 
-    citas = Cita.objects.filter(
-        fecha__range=[inicio_semana, fin_semana]
-    ).select_related('cliente', 'motocicleta', 'mecanico').order_by('fecha', 'hora')
-
-    if mecanico_id:
-        citas = citas.filter(mecanico__dui=mecanico_id)
-    if estado_filtro:
-        citas = citas.filter(estado=estado_filtro)
-
-    dias = []
-    for i in range(7):
-        dia = inicio_semana + timedelta(days=i)
-        dias.append({
-            'fecha': dia,
-            'citas': [c for c in citas if c.fecha == dia],
+    if modo == 'dia':
+        citas = consultar(fecha_base, fecha_base)
+        contexto.update({
+            'citas_dia': citas,
+            'fecha_anterior': fecha_base - timedelta(days=1),
+            'fecha_siguiente': fecha_base + timedelta(days=1),
+            'es_hoy': fecha_base == hoy,
         })
 
-    mecanicos = Mecanico.objects.filter(activo=True)
+    elif modo == 'mes':
+        primero = fecha_base.replace(day=1)
+        ultimo = fecha_base.replace(day=cal.monthrange(fecha_base.year, fecha_base.month)[1])
+        citas = consultar(primero, ultimo)
+        inicio_grilla = primero - timedelta(days=primero.weekday())
+        fin_grilla = ultimo + timedelta(days=6 - ultimo.weekday())
+        semanas = []
+        dia = inicio_grilla
+        while dia <= fin_grilla:
+            fila = []
+            for _ in range(7):
+                fila.append({
+                    'fecha': dia,
+                    'citas': [c for c in citas if c.fecha == dia],
+                    'es_hoy': dia == hoy,
+                    'del_mes': dia.month == fecha_base.month,
+                })
+                dia += timedelta(days=1)
+            semanas.append(fila)
+        contexto.update({
+            'semanas': semanas,
+            'nombres_dias': nombres_dias,
+            'mes_actual': primero,
+            'fecha_anterior': (primero - timedelta(days=1)).replace(day=1),
+            'fecha_siguiente': ultimo + timedelta(days=1),
+        })
 
-    return render(request, 'citas/calendario.html', {
-        'dias': dias,
-        'inicio_semana': inicio_semana,
-        'fin_semana': fin_semana,
-        'semana_offset': semana_offset,
-        'mecanicos': mecanicos,
-        'estados': Cita.ESTADOS,
-        'mecanico_id': mecanico_id,
-        'estado_filtro': estado_filtro,
-    })
+    else:  # semana
+        lunes = fecha_base - timedelta(days=fecha_base.weekday())
+        domingo = lunes + timedelta(days=6)
+        citas = consultar(lunes, domingo)
+        dias_semana = []
+        for i in range(7):
+            d = lunes + timedelta(days=i)
+            dias_semana.append({
+                'nombre': nombres_dias[i],
+                'fecha': d,
+                'citas': [c for c in citas if c.fecha == d],
+                'es_hoy': d == hoy,
+            })
+        contexto.update({
+            'dias_semana': dias_semana,
+            'lunes': lunes,
+            'domingo': domingo,
+            'fecha_anterior': lunes - timedelta(days=7),
+            'fecha_siguiente': lunes + timedelta(days=7),
+        })
+
+    return render(request, 'citas/calendario.html', contexto)
 
 
 @login_required(login_url='usuarios:login')
@@ -495,6 +493,7 @@ def cita_admin_detalle(request, cita_id):
     cita = get_object_or_404(Cita, id=cita_id)
     servicios = cita.serviciocita_set.select_related('servicio').all()
     cambios = cita.cambios_estado.select_related('realizado_por').all()
+    mecanicos = Mecanico.objects.filter(activo=True).order_by('apellido', 'nombre')
 
     TRANSICIONES = {
         Cita.ESTADO_PENDIENTE:  [Cita.ESTADO_CONFIRMADA, Cita.ESTADO_CANCELADA],
@@ -504,30 +503,66 @@ def cita_admin_detalle(request, cita_id):
         Cita.ESTADO_CANCELADA:  [],
     }
     estados_posibles = TRANSICIONES.get(cita.estado, [])
+    puede_asignar_mecanico = cita.estado not in [Cita.ESTADO_COMPLETADA, Cita.ESTADO_CANCELADA]
 
     if request.method == 'POST':
-        nuevo_estado = request.POST.get('nuevo_estado', '').strip()
-        motivo = request.POST.get('motivo', '').strip()
+        accion = request.POST.get('accion', '').strip()
 
-        if nuevo_estado not in estados_posibles:
-            messages.error(request, 'Transición de estado no válida.')
+        if accion == 'asignar_mecanico':
+            if not puede_asignar_mecanico:
+                messages.error(request, 'No se puede asignar mecánico a esta cita.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+            mecanico_dui = request.POST.get('mecanico_dui', '').strip()
+            if mecanico_dui:
+                try:
+                    mecanico = Mecanico.objects.get(dui=mecanico_dui, activo=True)
+                    conflicto = Cita.objects.filter(
+                        mecanico=mecanico,
+                        fecha=cita.fecha,
+                        hora=cita.hora,
+                        estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA, Cita.ESTADO_EN_PROCESO],
+                    ).exclude(id=cita.id).exists()
+                    if conflicto:
+                        messages.error(request, f'{mecanico.nombre} {mecanico.apellido} ya tiene otra cita el {cita.fecha} a las {cita.hora.strftime("%H:%M")}.')
+                        return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+                    cita.mecanico = mecanico
+                    cita.save()
+                    messages.success(request, f'Mecánico asignado: {mecanico.nombre} {mecanico.apellido}.')
+                except Mecanico.DoesNotExist:
+                    messages.error(request, 'Mecánico no válido.')
+            else:
+                cita.mecanico = None
+                cita.save()
+                messages.success(request, 'Mecánico removido de la cita.')
             return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
-        if nuevo_estado == Cita.ESTADO_CANCELADA and not motivo:
-            messages.error(request, 'El motivo es obligatorio para cancelar.')
-            return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+        elif accion == 'cambiar_estado':
+            nuevo_estado = request.POST.get('nuevo_estado', '').strip()
+            motivo = request.POST.get('motivo', '').strip()
 
-        CambioEstadoCita.objects.create(
-            cita=cita,
-            estado_anterior=cita.estado,
-            estado_nuevo=nuevo_estado,
-            motivo=motivo,
-            realizado_por=request.user,
-        )
-        cita.estado = nuevo_estado
-        cita.save()
-        messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
-        return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+            if nuevo_estado not in estados_posibles:
+                messages.error(request, 'Transición de estado no válida.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            if nuevo_estado == Cita.ESTADO_CANCELADA and not motivo:
+                messages.error(request, 'El motivo es obligatorio para cancelar.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            CambioEstadoCita.objects.create(
+                cita=cita,
+                estado_anterior=cita.estado,
+                estado_nuevo=nuevo_estado,
+                motivo=motivo,
+                realizado_por=request.user,
+            )
+            cita.estado = nuevo_estado
+            cita.save()
+            messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
+            return redirect('citas:calendario')
+
+        else:
+            messages.error(request, 'Acción no reconocida.')
+            return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
     return render(request, 'citas/cita_admin_detalle.html', {
         'cita': cita,
@@ -535,76 +570,14 @@ def cita_admin_detalle(request, cita_id):
         'cambios': cambios,
         'estados_posibles': estados_posibles,
         'estados_display': dict(Cita.ESTADOS),
+        'mecanicos': mecanicos,
+        'puede_asignar_mecanico': puede_asignar_mecanico,
+        'opciones_estado': [(c, dict(Cita.ESTADOS)[c]) for c in estados_posibles],
     })
 
 
 @login_required(login_url='usuarios:login')
 def mis_citas_mecanico(request):
-    return render(request, 'citas/mis_citas_mecanico.html')
-
-
-@login_required(login_url='usuarios:login')
-def reagendar_cita(request, cita_id):
-    """Permite al cliente cambiar la fecha y hora de una cita."""
-    cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
-
-    if not cita.puede_reagendarse():
-        messages.error(request, 'Esta cita no puede reagendarse.')
-        return redirect('citas:cita_detalle', cita_id=cita.id)
-
-    if request.method == 'POST':
-        nueva_fecha = request.POST.get('fecha', '').strip()
-        nueva_hora = request.POST.get('hora', '').strip()
-
-        errores = {}
-
-        if not nueva_fecha:
-            errores['fecha'] = 'La fecha es obligatoria.'
-        if not nueva_hora:
-            errores['hora'] = 'La hora es obligatoria.'
-
-        fecha_obj = None
-        hora_obj = None
-
-        if nueva_fecha:
-            from datetime import date, datetime
-            try:
-                fecha_obj = datetime.strptime(nueva_fecha, '%Y-%m-%d').date()
-                if fecha_obj < date.today():
-                    errores['fecha'] = 'La fecha debe ser posterior a hoy.'
-                elif fecha_obj == date.today():
-                    errores['fecha'] = 'No podés reagendar para el mismo día de hoy.'
-            except ValueError:
-                errores['fecha'] = 'Formato de fecha inválido.'
-
-        if nueva_hora:
-            from datetime import datetime
-            try:
-                hora_obj = datetime.strptime(nueva_hora, '%H:%M').time()
-            except ValueError:
-                errores['hora'] = 'Formato de hora inválido.'
-
-        if errores:
-            return render(request, 'citas/reagendar_cita.html', {
-                'cita': cita,
-                'errores': errores,
-                'fecha': nueva_fecha,
-                'hora': nueva_hora,
-            })
-
-        cita.fecha = fecha_obj
-        cita.hora = hora_obj
-        if cita.estado == Cita.ESTADO_CONFIRMADA:
-            cita.estado = Cita.ESTADO_PENDIENTE
-        cita.save()
-
-        messages.success(request, 'Cita reagendada correctamente.')
-        return redirect('citas:cita_detalle', cita_id=cita.id)
-
-    return render(request, 'citas/reagendar_cita.html', {
-        'cita': cita,
-        'fecha': cita.fecha.strftime('%Y-%m-%d'),
-        'hora': cita.hora.strftime('%H:%M'),
     if not request.user.is_mecanico:
         messages.error(request, 'Solo los mecánicos pueden ver esta sección.')
         return redirect('core:home')

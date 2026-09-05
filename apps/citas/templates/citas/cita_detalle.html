@@ -25,6 +25,12 @@
 <p class="text-muted small mb-1">MOTOCICLETA</p>
 <p class="mb-4">{{ cita.motocicleta }}</p>
 
+<!-- Sección: Mecánico asignado (SCRUM-18) -->
+<p class="text-muted small mb-1">MECÁNICO ASIGNADO</p>
+<p class="mb-4">
+    {% if cita.mecanico %}{{ cita.mecanico.nombre }} {{ cita.mecanico.apellido }}{% else %}<span class="text-muted">Por asignar</span>{% endif %}
+</p>
+
 <!-- Sección: Lista de servicios solicitados en esta cita -->
 <p class="text-muted small mb-1">SERVICIOS SOLICITADOS</p>
 <!-- Recorre cada servicio asociado a la cita mediante la tabla ServicioCita -->
