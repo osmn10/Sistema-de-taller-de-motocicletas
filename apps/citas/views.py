@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -13,6 +14,7 @@ from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
 from .models import Cita, CambioEstadoCita, ServicioCita
+from .services import notificar_cita_agendada, notificar_cita_confirmada
 
 
 @login_required(login_url='usuarios:login')
@@ -195,27 +197,32 @@ def agendar_cita(request):
                 'form_observaciones': observaciones,
             })
 
-        cita = Cita.objects.create(
-            cliente=cliente,
-            motocicleta=moto,
-            fecha=fecha,
-            hora=hora,
-            observaciones=observaciones,
-        )
-        ServicioCita.objects.create(
-            cita=cita,
-            servicio=servicio_principal,
-            precio_final=servicio_principal.precio_base,
-        )
-        for extra_id in servicios_extra_ids:
-            try:
-                extra = Servicio.objects.get(id=extra_id, activo=True)
-            except Servicio.DoesNotExist:
-                continue
+        with transaction.atomic():
+            cita = Cita.objects.create(
+                cliente=cliente,
+                motocicleta=moto,
+                fecha=fecha,
+                hora=hora,
+                observaciones=observaciones,
+            )
             ServicioCita.objects.create(
                 cita=cita,
-                servicio=extra,
-                precio_final=extra.precio_base,
+                servicio=servicio_principal,
+                precio_final=servicio_principal.precio_base,
+            )
+            for extra_id in servicios_extra_ids:
+                try:
+                    extra = Servicio.objects.get(id=extra_id, activo=True)
+                except Servicio.DoesNotExist:
+                    continue
+                ServicioCita.objects.create(
+                    cita=cita,
+                    servicio=extra,
+                    precio_final=extra.precio_base,
+                )
+
+            transaction.on_commit(
+                lambda cita_id=cita.id: notificar_cita_agendada(cita_id)
             )
 
         messages.success(request, f'Cita #{cita.id} agendada para el {fecha} a las {hora.strftime("%H:%M")}.')
@@ -547,15 +554,22 @@ def cita_admin_detalle(request, cita_id):
                 messages.error(request, 'El motivo es obligatorio para cancelar.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
-            CambioEstadoCita.objects.create(
-                cita=cita,
-                estado_anterior=cita.estado,
-                estado_nuevo=nuevo_estado,
-                motivo=motivo,
-                realizado_por=request.user,
-            )
-            cita.estado = nuevo_estado
-            cita.save()
+            with transaction.atomic():
+                CambioEstadoCita.objects.create(
+                    cita=cita,
+                    estado_anterior=cita.estado,
+                    estado_nuevo=nuevo_estado,
+                    motivo=motivo,
+                    realizado_por=request.user,
+                )
+                cita.estado = nuevo_estado
+                cita.save(update_fields=['estado'])
+
+                if nuevo_estado == Cita.ESTADO_CONFIRMADA:
+                    transaction.on_commit(
+                        lambda cita_id=cita.id: notificar_cita_confirmada(cita_id)
+                    )
+
             messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
             return redirect('citas:calendario')
 
