@@ -10,7 +10,12 @@ from apps.usuarios.models import Mecanico, Usuario
 from apps.vehiculos.models import Motocicleta
 
 from .models import Cita, ServicioCita
-from .services import notificar_cita_agendada, notificar_cita_confirmada
+from .services import (
+    notificar_cita_agendada,
+    notificar_cita_cancelada,
+    notificar_cita_confirmada,
+    notificar_cita_reagendada,
+)
 
 
 @override_settings(
@@ -141,3 +146,69 @@ class NotificacionesCitaTests(TestCase):
         cita.refresh_from_db()
         self.assertEqual(cita.estado, Cita.ESTADO_CONFIRMADA)
         notificar.assert_called_once_with(cita.id)
+
+    def test_correo_de_cita_cancelada_incluye_detalles(self):
+        cita = self.crear_cita()
+
+        enviado = notificar_cita_cancelada(cita.id)
+
+        self.assertTrue(enviado)
+        self.assertEqual(len(mail.outbox), 1)
+        mensaje = mail.outbox[0]
+        self.assertEqual(mensaje.to, ['ana@example.com'])
+        self.assertIn(f'Cita #{cita.id} cancelada', mensaje.subject)
+        contenido_html, tipo_mime = mensaje.alternatives[0]
+        self.assertEqual(tipo_mime, 'text/html')
+        self.assertIn('Cambio de aceite', contenido_html)
+        self.assertIn('M-1234', contenido_html)
+
+    def test_correo_de_cita_reagendada_incluye_fecha_anterior(self):
+        cita = self.crear_cita(estado=Cita.ESTADO_CONFIRMADA)
+        fecha_anterior = cita.fecha
+        hora_anterior = cita.hora
+        cita.fecha = cita.fecha + timedelta(days=5)
+        cita.hora = time(11, 0)
+        cita.save()
+
+        enviado = notificar_cita_reagendada(cita.id, fecha_anterior, hora_anterior)
+
+        self.assertTrue(enviado)
+        mensaje = mail.outbox[0]
+        self.assertIn(f'Cita #{cita.id} reagendada', mensaje.subject)
+        contenido_html, _ = mensaje.alternatives[0]
+        self.assertIn(fecha_anterior.strftime('%d/%m/%Y'), contenido_html)
+        self.assertIn(cita.fecha.strftime('%d/%m/%Y'), contenido_html)
+
+    @patch('apps.citas.views.notificar_cita_cancelada')
+    def test_cancelar_dispara_notificacion_despues_de_guardar(self, notificar):
+        cita = self.crear_cita()
+        self.client.force_login(self.cliente)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            respuesta = self.client.post(
+                reverse('citas:cancelar_cita', args=[cita.id]),
+            )
+
+        self.assertEqual(respuesta.status_code, 302)
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado, Cita.ESTADO_CANCELADA)
+        notificar.assert_called_once_with(cita.id)
+
+    @patch('apps.citas.views.notificar_cita_reagendada')
+    def test_reagendar_dispara_notificacion_despues_de_guardar(self, notificar):
+        cita = self.crear_cita()
+        fecha_anterior = cita.fecha
+        hora_anterior = cita.hora
+        nueva_fecha = fecha_anterior + timedelta(days=3)
+        self.client.force_login(self.cliente)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            respuesta = self.client.post(
+                reverse('citas:reagendar_cita', args=[cita.id]),
+                {'fecha': nueva_fecha.isoformat(), 'hora': '10:00'},
+            )
+
+        self.assertEqual(respuesta.status_code, 302)
+        cita.refresh_from_db()
+        self.assertEqual(cita.fecha, nueva_fecha)
+        notificar.assert_called_once_with(cita.id, fecha_anterior, hora_anterior)

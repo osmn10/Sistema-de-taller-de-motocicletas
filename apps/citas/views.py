@@ -14,7 +14,12 @@ from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
 from .models import Cita, CambioEstadoCita, ServicioCita
-from .services import notificar_cita_agendada, notificar_cita_confirmada
+from .services import (
+    notificar_cita_agendada,
+    notificar_cita_cancelada,
+    notificar_cita_confirmada,
+    notificar_cita_reagendada,
+)
 
 
 @login_required(login_url='usuarios:login')
@@ -296,9 +301,20 @@ def reagendar_cita(request, cita_id):
             url = reverse('citas:reagendar_cita', args=[cita.id])
             return redirect(f'{url}?fecha={nueva_fecha.isoformat()}')
 
-        cita.fecha = nueva_fecha
-        cita.hora = nueva_hora
-        cita.save()
+        fecha_anterior = cita.fecha
+        hora_anterior = cita.hora
+
+        with transaction.atomic():
+            cita.fecha = nueva_fecha
+            cita.hora = nueva_hora
+            cita.save()
+
+            transaction.on_commit(
+                lambda cita_id=cita.id: notificar_cita_reagendada(
+                    cita_id, fecha_anterior, hora_anterior,
+                )
+            )
+
         messages.success(
             request,
             f'Cita #{cita.id} reagendada para el {nueva_fecha} a las {nueva_hora.strftime("%H:%M")}.',
@@ -368,8 +384,14 @@ def cancelar_cita(request, cita_id):
     cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
     if request.method == 'POST':
         if cita.puede_cancelarse():
-            cita.estado = Cita.ESTADO_CANCELADA
-            cita.save()
+            with transaction.atomic():
+                cita.estado = Cita.ESTADO_CANCELADA
+                cita.save()
+
+                transaction.on_commit(
+                    lambda cita_id=cita.id: notificar_cita_cancelada(cita_id)
+                )
+
             messages.success(request, f'Cita cancelada correctamente.')
         else:
             messages.error(request, 'Esta cita no puede cancelarse.')
