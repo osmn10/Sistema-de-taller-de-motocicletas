@@ -9,11 +9,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from apps.configuracion.models import HorarioTaller
+from apps.productos.models import Producto
 from apps.servicios.models import Servicio
 from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
-from .models import Cita, CambioEstadoCita, ServicioCita
+from .models import Cita, CambioEstadoCita, RepuestoUsado, ServicioCita
 from .services import (
     notificar_cita_agendada,
     notificar_cita_cancelada,
@@ -533,6 +534,13 @@ def cita_admin_detalle(request, cita_id):
     estados_posibles = TRANSICIONES.get(cita.estado, [])
     puede_asignar_mecanico = cita.estado not in [Cita.ESTADO_COMPLETADA, Cita.ESTADO_CANCELADA]
 
+    # V2SCRUM-24: pasar a "Completada" exige registrar repuestos usados y
+    # observaciones de cierre, así que esa transición se maneja con su propio
+    # formulario ("finalizar_servicio") y se quita del selector genérico.
+    puede_finalizar = Cita.ESTADO_COMPLETADA in estados_posibles
+    opciones_estado_genericas = [c for c in estados_posibles if c != Cita.ESTADO_COMPLETADA]
+    productos_disponibles = Producto.objects.filter(activo=True).order_by('nombre')
+
     if request.method == 'POST':
         accion = request.POST.get('accion', '').strip()
 
@@ -568,6 +576,10 @@ def cita_admin_detalle(request, cita_id):
             nuevo_estado = request.POST.get('nuevo_estado', '').strip()
             motivo = request.POST.get('motivo', '').strip()
 
+            if nuevo_estado == Cita.ESTADO_COMPLETADA:
+                messages.error(request, 'Para finalizar el servicio usá el formulario "Finalizar servicio".')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
             if nuevo_estado not in estados_posibles:
                 messages.error(request, 'Transición de estado no válida.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
@@ -595,6 +607,99 @@ def cita_admin_detalle(request, cita_id):
             messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
             return redirect('citas:calendario')
 
+        elif accion == 'finalizar_servicio':
+            """V2SCRUM-24: registra repuestos usados, observaciones de cierre,
+            descuenta el inventario y pasa la cita a Completada."""
+            if not puede_finalizar:
+                messages.error(request, 'Solo podés finalizar una cita que esté en proceso.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            productos_ids = request.POST.getlist('producto_id')
+            cantidades = request.POST.getlist('cantidad')
+            observaciones_cierre = request.POST.get('observaciones_cierre', '').strip()
+
+            repuestos_validados = []
+            errores_repuestos = []
+            productos_vistos = set()
+
+            for producto_id, cantidad_str in zip(productos_ids, cantidades):
+                producto_id = producto_id.strip()
+                cantidad_str = cantidad_str.strip()
+                if not producto_id and not cantidad_str:
+                    continue  # fila vacía del formulario, se ignora
+
+                if not producto_id or not cantidad_str:
+                    errores_repuestos.append('Completá producto y cantidad en cada fila que agregues.')
+                    continue
+
+                try:
+                    cantidad = int(cantidad_str)
+                except ValueError:
+                    errores_repuestos.append('La cantidad debe ser un número entero.')
+                    continue
+
+                if cantidad <= 0:
+                    errores_repuestos.append('La cantidad debe ser mayor a cero.')
+                    continue
+
+                try:
+                    producto = Producto.objects.get(id=producto_id, activo=True)
+                except (Producto.DoesNotExist, ValueError):
+                    errores_repuestos.append('Seleccionaste un producto inválido.')
+                    continue
+
+                if producto.id in productos_vistos:
+                    errores_repuestos.append(f'"{producto.nombre}" está repetido en la lista.')
+                    continue
+                productos_vistos.add(producto.id)
+
+                if cantidad > producto.stock_actual:
+                    errores_repuestos.append(
+                        f'No hay stock suficiente de "{producto.nombre}" '
+                        f'(disponible: {producto.stock_actual}).'
+                    )
+                    continue
+
+                repuestos_validados.append((producto, cantidad))
+
+            if errores_repuestos:
+                for error in errores_repuestos:
+                    messages.error(request, error)
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            with transaction.atomic():
+                for producto, cantidad in repuestos_validados:
+                    RepuestoUsado.objects.create(
+                        cita=cita,
+                        producto=producto,
+                        cantidad=cantidad,
+                    )
+                    producto.stock_actual = producto.stock_actual - cantidad
+                    producto.save(update_fields=['stock_actual'])
+
+                CambioEstadoCita.objects.create(
+                    cita=cita,
+                    estado_anterior=cita.estado,
+                    estado_nuevo=Cita.ESTADO_COMPLETADA,
+                    motivo=observaciones_cierre,
+                    realizado_por=request.user,
+                )
+                cita.estado = Cita.ESTADO_COMPLETADA
+                cita.observaciones_cierre = observaciones_cierre
+                cita.save(update_fields=['estado', 'observaciones_cierre'])
+
+                # V2SCRUM-30 (ticket PDF) y V2SCRUM-33 (correo de cierre)
+                # dependen del cálculo de detalle/total (V2SCRUM-27) y del
+                # PDF ya generado. Cuando ambos estén listos, este es el
+                # lugar donde se enganchan con transaction.on_commit(...),
+                # igual que notificar_cita_confirmada arriba.
+
+            messages.success(
+                request,
+                f'Cita #{cita.id} finalizada. Inventario actualizado con {len(repuestos_validados)} repuesto(s).',
+            )
+            return redirect('citas:calendario')
+
         else:
             messages.error(request, 'Acción no reconocida.')
             return redirect('citas:cita_admin_detalle', cita_id=cita.id)
@@ -607,7 +712,10 @@ def cita_admin_detalle(request, cita_id):
         'estados_display': dict(Cita.ESTADOS),
         'mecanicos': mecanicos,
         'puede_asignar_mecanico': puede_asignar_mecanico,
-        'opciones_estado': [(c, dict(Cita.ESTADOS)[c]) for c in estados_posibles],
+        'opciones_estado': [(c, dict(Cita.ESTADOS)[c]) for c in opciones_estado_genericas],
+        'puede_finalizar': puede_finalizar,
+        'productos_disponibles': productos_disponibles,
+        'repuestos_usados': cita.repuestos_usados.select_related('producto').all(),
     })
 
 
