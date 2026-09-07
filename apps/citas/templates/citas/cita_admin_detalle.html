@@ -64,6 +64,114 @@
         <p class="mb-4">{{ cita.observaciones }}</p>
         {% endif %}
 
+        {% if repuestos_usados %}
+        <p class="text-muted small mb-1">REPUESTOS USADOS</p>
+        <ul class="mb-4">
+            {% for ru in repuestos_usados %}
+            <li>{{ ru.cantidad }} x {{ ru.producto.nombre }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if cita.observaciones_cierre %}
+        <p class="text-muted small mb-1">OBSERVACIONES DE CIERRE</p>
+        <p class="mb-4">{{ cita.observaciones_cierre }}</p>
+        {% endif %}
+
+        {% if puede_finalizar %}
+        <hr class="my-4">
+        <p class="text-muted small mb-3">FINALIZAR SERVICIO</p>
+        <form method="post" id="form-finalizar">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="finalizar_servicio">
+
+            <label class="form-label small text-muted">Repuestos usados (opcional)</label>
+            <div id="filas-repuestos">
+                <div class="row g-2 mb-2 fila-repuesto">
+                    <div class="col-sm-7">
+                        <select name="producto_id" class="form-select" style="border-style: dashed;">
+                            <option value="">— Sin repuesto —</option>
+                            {% for producto in productos_disponibles %}
+                            <option value="{{ producto.id }}">
+                                {{ producto.nombre }} (stock: {{ producto.stock_actual }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-sm-3">
+                        <input type="number" name="cantidad" min="1" class="form-control"
+                               placeholder="Cantidad" style="border-style: dashed;">
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" class="btn btn-outline-dark w-100 btn-quitar-fila">Quitar</button>
+                    </div>
+                </div>
+            </div>
+            <button type="button" id="btn-agregar-fila" class="btn btn-sm btn-outline-dark mb-3">
+                + Agregar otro repuesto
+            </button>
+
+            <div class="mb-3">
+                <label class="form-label small text-muted">Observaciones de cierre</label>
+                <textarea name="observaciones_cierre" class="form-control" rows="3"
+                          style="border-style: dashed;"
+                          placeholder="Ej. se reemplazó pastilla de freno trasera, cliente notificado"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-dark">Finalizar servicio</button>
+        </form>
+
+        <template id="plantilla-fila-repuesto">
+            <div class="row g-2 mb-2 fila-repuesto">
+                <div class="col-sm-7">
+                    <select name="producto_id" class="form-select" style="border-style: dashed;">
+                        <option value="">— Sin repuesto —</option>
+                        {% for producto in productos_disponibles %}
+                        <option value="{{ producto.id }}">
+                            {{ producto.nombre }} (stock: {{ producto.stock_actual }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-3">
+                    <input type="number" name="cantidad" min="1" class="form-control"
+                           placeholder="Cantidad" style="border-style: dashed;">
+                </div>
+                <div class="col-sm-2">
+                    <button type="button" class="btn btn-outline-dark w-100 btn-quitar-fila">Quitar</button>
+                </div>
+            </div>
+        </template>
+
+        <script>
+            (function () {
+                var contenedor = document.getElementById('filas-repuestos');
+                var plantilla = document.getElementById('plantilla-fila-repuesto');
+                var btnAgregar = document.getElementById('btn-agregar-fila');
+
+                if (!contenedor || !plantilla || !btnAgregar) return;
+
+                btnAgregar.addEventListener('click', function () {
+                    var nodo = plantilla.content.cloneNode(true);
+                    contenedor.appendChild(nodo);
+                });
+
+                contenedor.addEventListener('click', function (evento) {
+                    if (evento.target.classList.contains('btn-quitar-fila')) {
+                        var filas = contenedor.querySelectorAll('.fila-repuesto');
+                        if (filas.length > 1) {
+                            evento.target.closest('.fila-repuesto').remove();
+                        } else {
+                            evento.target.closest('.fila-repuesto').querySelectorAll('select, input').forEach(function (campo) {
+                                campo.value = '';
+                            });
+                        }
+                    }
+                });
+            })();
+        </script>
+        {% endif %}
+
         {% if opciones_estado %}
         <hr class="my-4">
         <p class="text-muted small mb-3">CAMBIAR ESTADO</p>
