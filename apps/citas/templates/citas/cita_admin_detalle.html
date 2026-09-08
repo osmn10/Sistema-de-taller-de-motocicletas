@@ -1,0 +1,248 @@
+{% extends "core/base.html" %}
+{% load static l10n %}
+
+{% block title %}Cita #{{ cita.id }} — Admin{% endblock %}
+
+{% block content %}
+<a href="{% url 'citas:calendario' %}" class="text-decoration-none text-muted small">‹ Volver al calendario</a>
+
+<div class="mt-3 mb-4 d-flex align-items-center gap-3">
+    <h2 class="mb-0">Cita #{{ cita.id }}</h2>
+    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">
+        {{ cita.get_estado_display }}
+    </span>
+</div>
+
+<div class="row">
+    <div class="col-md-7">
+
+        <p class="text-muted small mb-1">FECHA Y HORA</p>
+        <p class="mb-4">{{ cita.fecha|date:"j N Y" }} · {{ cita.hora|time:"H:i" }}</p>
+
+        <p class="text-muted small mb-1">CLIENTE</p>
+        <p class="mb-4">{{ cita.cliente.nombre }} {{ cita.cliente.apellido }} — {{ cita.cliente.dui }}</p>
+
+        <p class="text-muted small mb-1">MOTOCICLETA</p>
+        <p class="mb-4">{{ cita.motocicleta }}</p>
+
+        <p class="text-muted small mb-1">MECÁNICO ASIGNADO</p>
+        <div class="mb-4">
+            {% if cita.mecanico %}
+                <p class="mb-2">{{ cita.mecanico.nombre }} {{ cita.mecanico.apellido }}</p>
+            {% else %}
+                <p class="text-muted mb-2">Sin asignar</p>
+            {% endif %}
+            {% if puede_asignar_mecanico %}
+            <form method="post" class="d-flex gap-2 align-items-center">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="asignar_mecanico">
+                <select name="mecanico_dui" class="form-select form-select-sm" style="border-style: dashed; max-width: 260px;">
+                    <option value="">— Sin mecánico —</option>
+                    {% for m in mecanicos %}
+                    <option value="{{ m.dui }}" {% if cita.mecanico.dui == m.dui %}selected{% endif %}>
+                        {{ m.nombre }} {{ m.apellido }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-dark">Asignar</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <section class="mb-4" aria-labelledby="titulo-detalle-economico">
+            <h3 id="titulo-detalle-economico" class="h5">Detalle y total del servicio</h3>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <caption class="caption-top">Servicios solicitados</caption>
+                    <thead><tr><th scope="col">Servicio</th><th scope="col" class="text-end">Precio</th></tr></thead>
+                    <tbody>
+                        {% for linea in detalle_economico.servicios %}
+                        <tr><td>{{ linea.nombre }}</td><td class="text-end">${{ linea.precio|floatformat:2 }}</td></tr>
+                        {% empty %}
+                        <tr><td colspan="2">Sin servicios registrados.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot><tr><th scope="row">Subtotal de servicios</th><td class="text-end">${{ detalle_economico.subtotal_servicios|floatformat:2 }}</td></tr></tfoot>
+                </table>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <caption class="caption-top">Repuestos e insumos utilizados</caption>
+                    <thead><tr><th scope="col">Producto</th><th scope="col">Cantidad</th><th scope="col" class="text-end">Precio unitario</th><th scope="col" class="text-end">Importe</th></tr></thead>
+                    <tbody>
+                        {% for linea in detalle_economico.repuestos %}
+                        <tr>
+                            <td>{{ linea.nombre }}{% if linea.estimado %} <span class="badge text-bg-warning">Referencial</span>{% endif %}</td>
+                            <td>{{ linea.cantidad }}</td>
+                            <td class="text-end">${{ linea.precio_unitario|floatformat:2 }}</td>
+                            <td class="text-end">{% if linea.importe != None %}${{ linea.importe|floatformat:2 }}{% else %}Sin precio válido{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4">Sin repuestos registrados.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot><tr><th scope="row" colspan="3">Subtotal de repuestos{% if detalle_economico.es_referencial %} (referencial){% endif %}</th><td class="text-end">${{ detalle_economico.subtotal_repuestos|floatformat:2 }}</td></tr></tfoot>
+                </table>
+            </div>
+            {% if detalle_economico.errores %}
+            <div class="alert alert-warning">
+                <p class="mb-1">No se puede calcular un total válido:</p>
+                <ul class="mb-0">{% for error in detalle_economico.errores %}<li>{{ error }}</li>{% endfor %}</ul>
+            </div>
+            {% else %}
+            <p class="fs-5 fw-bold">{% if detalle_economico.es_referencial %}Total referencial{% else %}Total general{% endif %}: ${{ detalle_economico.total_referencia|floatformat:2 }}</p>
+            {% endif %}
+            {% if detalle_economico.es_referencial %}
+            <p class="alert alert-warning small">Hay repuestos anteriores a este cálculo sin precio histórico guardado. Se usa su precio actual solo como referencia: este importe no confirma lo cobrado y puede cambiar si cambia el catálogo.</p>
+            {% elif cita.estado != 'completada' %}
+            <p class="small text-muted">Importe de lo registrado hasta ahora; los repuestos seleccionados al cerrar se suman en el resumen antes de finalizar.</p>
+            {% endif %}
+        </section>
+
+        {% if cita.observaciones %}
+        <p class="text-muted small mb-1">OBSERVACIONES</p>
+        <p class="mb-4">{{ cita.observaciones }}</p>
+        {% endif %}
+
+        {% if cita.observaciones_cierre %}
+        <p class="text-muted small mb-1">OBSERVACIONES DE CIERRE</p>
+        <p class="mb-4">{{ cita.observaciones_cierre }}</p>
+        {% endif %}
+
+        {% if puede_finalizar %}
+        <hr class="my-4">
+        <p class="text-muted small mb-3">FINALIZAR SERVICIO</p>
+        <form method="post" id="form-finalizar"
+              data-subtotal-servicios="{{ detalle_economico.subtotal_servicios|unlocalize }}"
+              data-precios-validos="{{ detalle_economico.errores|yesno:'false,true' }}">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="finalizar_servicio">
+            <div id="error-finalizar" class="border border-danger text-danger rounded p-3 mb-3"
+                 role="alert" tabindex="-1" hidden></div>
+
+            <label class="form-label small text-muted">Repuestos usados (opcional)</label>
+            <div id="filas-repuestos">
+                <div class="row g-2 mb-2 fila-repuesto">
+                    <div class="col-sm-7">
+                        <select name="producto_id" aria-label="Repuesto usado" class="form-select" style="border-style: dashed;">
+                            <option value="">— Sin repuesto —</option>
+                            {% for producto in productos_disponibles %}
+                            <option value="{{ producto.id }}" data-precio="{{ producto.precio|unlocalize }}">
+                                {{ producto.nombre }} · ${{ producto.precio|floatformat:2 }} (stock: {{ producto.stock_actual }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-sm-3">
+                        <input type="number" name="cantidad" min="1" step="1" aria-label="Cantidad del repuesto" class="form-control"
+                               placeholder="Cantidad" style="border-style: dashed;">
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="button" class="btn btn-outline-dark w-100 btn-quitar-fila">Quitar</button>
+                    </div>
+                    <div class="col-12 small text-muted importe-repuesto" aria-live="polite"></div>
+                </div>
+            </div>
+            <button type="button" id="btn-agregar-fila" class="btn btn-sm btn-outline-dark mb-3">
+                + Agregar otro repuesto
+            </button>
+
+            <div class="border rounded p-3 mb-3" aria-live="polite">
+                <h3 class="h6">Resumen antes de finalizar</h3>
+                <p class="mb-1">Subtotal de servicios: ${{ detalle_economico.subtotal_servicios|floatformat:2 }}</p>
+                <p class="mb-1">Subtotal de repuestos: <span id="preview-repuestos">—</span></p>
+                <p class="mb-1 fw-bold">Total general: <span id="preview-total">—</span></p>
+                <p class="small text-muted mb-0" id="preview-aviso">El cálculo se valida al finalizar.</p>
+                <noscript>La vista previa requiere JavaScript. El servidor calcula con los precios vigentes de los repuestos al finalizar.</noscript>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label small text-muted">Observaciones de cierre</label>
+                <textarea name="observaciones_cierre" class="form-control" rows="3"
+                          style="border-style: dashed;"
+                          placeholder="Ej. se reemplazó pastilla de freno trasera, cliente notificado"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-dark">Finalizar servicio</button>
+        </form>
+
+        <template id="plantilla-fila-repuesto">
+            <div class="row g-2 mb-2 fila-repuesto">
+                <div class="col-sm-7">
+                    <select name="producto_id" aria-label="Repuesto usado" class="form-select" style="border-style: dashed;">
+                        <option value="">— Sin repuesto —</option>
+                        {% for producto in productos_disponibles %}
+                        <option value="{{ producto.id }}" data-precio="{{ producto.precio|unlocalize }}">
+                            {{ producto.nombre }} · ${{ producto.precio|floatformat:2 }} (stock: {{ producto.stock_actual }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-3">
+                    <input type="number" name="cantidad" min="1" step="1" aria-label="Cantidad del repuesto" class="form-control"
+                           placeholder="Cantidad" style="border-style: dashed;">
+                </div>
+                <div class="col-sm-2">
+                    <button type="button" class="btn btn-outline-dark w-100 btn-quitar-fila">Quitar</button>
+                </div>
+                <div class="col-12 small text-muted importe-repuesto" aria-live="polite"></div>
+            </div>
+        </template>
+
+        <script src="{% static 'citas/js/detalle_total.js' %}" defer></script>
+        {% endif %}
+
+        {% if opciones_estado %}
+        <hr class="my-4">
+        <p class="text-muted small mb-3">CAMBIAR ESTADO</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="cambiar_estado">
+            <div class="row mb-3 align-items-start">
+                <label class="col-sm-3 col-form-label">Nuevo estado</label>
+                <div class="col-sm-9">
+                    <select name="nuevo_estado" class="form-select" style="border-style: dashed;" required>
+                        <option value="">Seleccioná un estado</option>
+                        {% for codigo, etiqueta in opciones_estado %}
+                        <option value="{{ codigo }}">{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row mb-3 align-items-start">
+                <label class="col-sm-3 col-form-label">Motivo</label>
+                <div class="col-sm-9">
+                    <input type="text" name="motivo" class="form-control"
+                           placeholder="Obligatorio si cancelás"
+                           style="border-style: dashed;">
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'citas:calendario' %}" class="btn btn-outline-dark">Cancelar</a>
+                <button type="submit" class="btn btn-dark">Guardar cambio</button>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="col-md-5">
+        <p class="text-muted small mb-3">HISTORIAL DE CAMBIOS</p>
+        {% for cambio in cambios %}
+        <div class="border rounded p-3 mb-2" style="border-style: dashed !important;">
+            <p class="small mb-1">
+                <strong>{{ cambio.estado_anterior }} → {{ cambio.estado_nuevo }}</strong>
+            </p>
+            <p class="small text-muted mb-1">
+                {{ cambio.fecha_cambio|date:"j N Y H:i" }} —
+                {{ cambio.realizado_por.nombre }} {{ cambio.realizado_por.apellido }}
+            </p>
+            {% if cambio.motivo %}
+            <p class="small mb-0">{{ cambio.motivo }}</p>
+            {% endif %}
+        </div>
+        {% empty %}
+        <p class="text-muted small">Sin cambios registrados.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

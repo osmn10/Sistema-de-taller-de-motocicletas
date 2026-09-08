@@ -25,6 +25,63 @@
 <p class="text-muted small mb-1">MOTOCICLETA</p>
 <p class="mb-4">{{ cita.motocicleta }}</p>
 
+<!-- Sección: Mecánico asignado (SCRUM-18) -->
+<p class="text-muted small mb-1">MECÁNICO ASIGNADO</p>
+<p class="mb-4">
+    {% if cita.mecanico %}{{ cita.mecanico.nombre }} {{ cita.mecanico.apellido }}{% else %}<span class="text-muted">Por asignar</span>{% endif %}
+</p>
+
+{% if detalle_economico %}
+<section class="mb-4" aria-labelledby="titulo-detalle-economico">
+    <h3 id="titulo-detalle-economico" class="h5">Detalle y total del servicio</h3>
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <caption class="caption-top">Servicios solicitados</caption>
+            <thead><tr><th scope="col">Servicio</th><th scope="col" class="text-end">Precio</th></tr></thead>
+            <tbody>
+                {% for linea in detalle_economico.servicios %}
+                <tr><td>{{ linea.nombre }}</td><td class="text-end">${{ linea.precio|floatformat:2 }}</td></tr>
+                {% empty %}
+                <tr><td colspan="2">Sin servicios registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot><tr><th scope="row">Subtotal de servicios</th><td class="text-end">${{ detalle_economico.subtotal_servicios|floatformat:2 }}</td></tr></tfoot>
+        </table>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <caption class="caption-top">Repuestos e insumos utilizados</caption>
+            <thead><tr><th scope="col">Producto</th><th scope="col">Cantidad</th><th scope="col" class="text-end">Precio unitario</th><th scope="col" class="text-end">Importe</th></tr></thead>
+            <tbody>
+                {% for linea in detalle_economico.repuestos %}
+                <tr>
+                    <td>{{ linea.nombre }}{% if linea.estimado %} <span class="badge text-bg-warning">Referencial</span>{% endif %}</td>
+                    <td>{{ linea.cantidad }}</td>
+                    <td class="text-end">${{ linea.precio_unitario|floatformat:2 }}</td>
+                    <td class="text-end">{% if linea.importe != None %}${{ linea.importe|floatformat:2 }}{% else %}Sin precio válido{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">Sin repuestos registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot><tr><th scope="row" colspan="3">Subtotal de repuestos{% if detalle_economico.es_referencial %} (referencial){% endif %}</th><td class="text-end">${{ detalle_economico.subtotal_repuestos|floatformat:2 }}</td></tr></tfoot>
+        </table>
+    </div>
+    {% if detalle_economico.errores %}
+    <div class="alert alert-warning">
+        <p class="mb-1">No se puede calcular un total válido:</p>
+        <ul class="mb-0">{% for error in detalle_economico.errores %}<li>{{ error }}</li>{% endfor %}</ul>
+    </div>
+    {% else %}
+    <p class="fs-5 fw-bold">{% if detalle_economico.es_referencial %}Total referencial{% else %}Total general{% endif %}: ${{ detalle_economico.total_referencia|floatformat:2 }}</p>
+    {% endif %}
+    {% if detalle_economico.es_referencial %}
+    <p class="alert alert-warning small">Hay repuestos anteriores a este cálculo sin precio histórico guardado. Se usa su precio actual solo como referencia: este importe no confirma lo cobrado y puede cambiar si cambia el catálogo.</p>
+    {% elif cita.estado != 'completada' %}
+    <p class="small text-muted">Importe de lo registrado hasta ahora; los repuestos seleccionados al cerrar se suman en el resumen antes de finalizar.</p>
+    {% endif %}
+</section>
+{% else %}
 <!-- Sección: Lista de servicios solicitados en esta cita -->
 <p class="text-muted small mb-1">SERVICIOS SOLICITADOS</p>
 <!-- Recorre cada servicio asociado a la cita mediante la tabla ServicioCita -->
@@ -34,6 +91,7 @@
     <!-- Se muestra si no hay servicios asociados a la cita -->
     <p class="text-muted">Sin servicios.</p>
 {% endfor %}
+{% endif %}
 
 <!-- Botones de acción: solo se muestran si la cita puede reagendarse o cancelarse -->
 {% if cita.puede_reagendarse or cita.puede_cancelarse %}

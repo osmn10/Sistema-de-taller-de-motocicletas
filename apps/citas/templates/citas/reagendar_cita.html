@@ -1,77 +1,74 @@
-<!-- Hereda el diseño base del sistema (navbar, footer, estilos) -->
-{% extends 'core/base.html' %}
+{% extends "core/base.html" %}
 
-<!-- Título que aparece en la pestaña del navegador -->
-{% block title %}Reagendar cita — Taller{% endblock %}
+{% block title %}Reagendar cita — Taller de Motos{% endblock %}
 
-<!-- Contenido principal de la página -->
 {% block content %}
+<p class="mb-2">
+    <a href="{% url 'citas:mis_citas' %}" class="text-decoration-none">&larr; Volver a mis citas</a>
+</p>
 
-<!-- Link para volver al detalle de la cita -->
-<a href="{% url 'citas:cita_detalle' cita.id %}" class="text-decoration-none text-muted small">‹ Volver al detalle</a>
+<h2 class="mb-1">Reagendar cita #{{ cita.id }}</h2>
+<p class="text-muted mb-4">
+    Actualmente: {{ cita.fecha }} · {{ cita.hora|time:"H:i" }} — {{ servicio.nombre }} — {{ cita.motocicleta }}
+</p>
 
-<!-- Título y descripción de la página -->
-<div class="mt-3 mb-4">
-    <h2>Reagendar Cita #{{ cita.id }}</h2>
-    <p class="text-muted">Seleccioná la nueva fecha y hora para tu cita.</p>
-</div>
-
-<!-- Recuadro informativo con los datos actuales de la cita (solo lectura) -->
-<div class="border rounded p-3 mb-4 bg-light">
-    <p class="text-muted small mb-1">MOTOCICLETA</p>
-    <p class="mb-2">{{ cita.motocicleta }}</p>
-    <p class="text-muted small mb-1">FECHA ACTUAL</p>
-    <!-- time:"H:i" formatea la hora como 10:00, 14:30, etc. -->
-    <p class="mb-0">{{ cita.fecha }} · {{ cita.hora|time:"H:i" }}</p>
-</div>
-
-<!-- Formulario para seleccionar nueva fecha y hora -->
-<!-- method="post" envía los datos de forma segura al servidor -->
-<form method="post">
-    <!-- Token CSRF: protección contra ataques de falsificación de solicitudes -->
-    {% csrf_token %}
-
-    <!-- Campo de nueva fecha -->
-    <div class="mb-3">
-        <label for="fecha" class="form-label text-muted small">NUEVA FECHA</label>
-        <!-- type="date" muestra un selector de calendario en el navegador -->
-        <!-- Si hay error en este campo, se agrega la clase is-invalid para mostrarlo en rojo -->
-        <input
-            type="date"
-            class="form-control {% if errores.fecha %}is-invalid{% endif %}"
-            id="fecha"
-            name="fecha"
-            value="{{ fecha }}"
-            required>
-        <!-- Mensaje de error que solo aparece si hay un error en el campo fecha -->
-        {% if errores.fecha %}
-        <div class="invalid-feedback">{{ errores.fecha }}</div>
-        {% endif %}
+<form method="get" action="{% url 'citas:reagendar_cita' cita.id %}" class="row g-3 mb-4">
+    <div class="col-md-5">
+        <label for="fecha" class="form-label">Nueva fecha</label>
+        <input type="date" name="fecha" id="fecha" class="form-control"
+               value="{{ fecha_str }}" min="{{ hoy }}" required>
     </div>
-
-    <!-- Campo de nueva hora -->
-    <div class="mb-3">
-        <label for="hora" class="form-label text-muted small">NUEVA HORA</label>
-        <!-- type="time" muestra un selector de hora en el navegador -->
-        <input
-            type="time"
-            class="form-control {% if errores.hora %}is-invalid{% endif %}"
-            id="hora"
-            name="hora"
-            value="{{ hora }}"
-            required>
-        <!-- Mensaje de error que solo aparece si hay un error en el campo hora -->
-        {% if errores.hora %}
-        <div class="invalid-feedback">{{ errores.hora }}</div>
-        {% endif %}
-    </div>
-
-    <!-- Botones de acción -->
-    <div class="d-flex gap-2 mt-4">
-        <!-- Botón para confirmar el reagendamiento (envía el formulario) -->
-        <button type="submit" class="btn btn-dark">Confirmar reagendamiento</button>
-        <!-- Botón para cancelar y volver al detalle sin hacer cambios -->
-        <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-outline-dark">Cancelar</a>
+    <div class="col-md-3 d-flex align-items-end">
+        <button type="submit" class="btn btn-dark w-100">Ver horarios</button>
     </div>
 </form>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if mensaje %}
+<div class="alert alert-warning">{{ mensaje }}</div>
+{% endif %}
+
+{% if slots %}
+<p class="mb-3"><strong>{{ fecha }}</strong> — {{ servicio.nombre }}</p>
+
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th class="text-muted fw-normal small">HORA</th>
+                <th class="text-muted fw-normal small">ESTADO</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for slot in slots %}
+            <tr>
+                <td>{{ slot.hora|time:"H:i" }}</td>
+                <td>
+                    {% if slot.libre %}
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Libre</span>
+                    {% else %}
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Lleno</span>
+                    {% endif %}
+                </td>
+                <td class="text-end">
+                    {% if slot.libre %}
+                    <form method="post" action="{% url 'citas:reagendar_cita' cita.id %}" class="d-inline"
+                          onsubmit="return confirm('¿Mover la cita al {{ fecha }} a las {{ slot.hora|time:'H:i' }}?')">
+                        {% csrf_token %}
+                        <input type="hidden" name="fecha" value="{{ fecha|date:'Y-m-d' }}">
+                        <input type="hidden" name="hora" value="{{ slot.hora|time:'H:i' }}">
+                        <button type="submit" class="btn btn-sm btn-dark">Mover aquí</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
 {% endblock %}

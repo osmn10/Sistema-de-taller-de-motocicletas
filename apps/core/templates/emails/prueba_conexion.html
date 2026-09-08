@@ -1,0 +1,10 @@
+{% extends "emails/base.html" %}
+
+{% block titulo %}Prueba de conexión{% endblock %}
+{% block preencabezado %}La configuración de correo funciona correctamente.{% endblock %}
+
+{% block contenido %}
+<h1 style="font-size:26px; margin:0 0 16px; color:#18181b;">Conexión exitosa</h1>
+<p style="margin:0 0 16px;">La conexión de correo del <strong>{{ taller_nombre }}</strong> funciona correctamente.</p>
+<p style="margin:0; color:#52525b;">Django pudo renderizar esta plantilla y entregarla mediante el proveedor configurado.</p>
+{% endblock %}

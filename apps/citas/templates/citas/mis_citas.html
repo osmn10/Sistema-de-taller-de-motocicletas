@@ -1,4 +1,4 @@
-﻿<!-- Hereda el diseño base del sistema (navbar, footer, estilos) -->
+<!-- Hereda el diseño base del sistema (navbar, footer, estilos) -->
 {% extends "core/base.html" %}
 
 <!-- Título que aparece en la pestaña del navegador -->
@@ -9,75 +9,94 @@
 
 <!-- Subtítulo y título de la sección -->
 <p class="text-muted small mb-1">MIS CITAS</p>
-<h2 class="mb-4">Mis citas</h2>
-
-<!-- Si el cliente tiene citas, mostrar la tabla -->
-{% if citas %}
-<table class="table">
-    <thead>
-        <tr>
-            <!-- Encabezados de la tabla con estilo gris y letra pequeña -->
-            <th class="text-muted fw-normal small">CITA</th>
-            <th class="text-muted fw-normal small">FECHA Y HORA</th>
-            <th class="text-muted fw-normal small">MOTOCICLETA</th>
-            <th class="text-muted fw-normal small">ESTADO</th>
-            <!-- Columna vacía para los botones de acción -->
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        <!-- Recorrer cada cita del cliente -->
-        {% for cita in citas %}
-        <tr>
-            <!-- Número de la cita -->
-            <td class="align-middle">#{{ cita.id }}</td>
-
-            <!-- Fecha y hora formateada (time:"H:i" muestra solo horas y minutos) -->
-            <td class="align-middle">{{ cita.fecha }} · {{ cita.hora|time:"H:i" }}</td>
-
-            <!-- Motocicleta asociada a la cita -->
-            <td class="align-middle">{{ cita.motocicleta }}</td>
-
-            <!-- Estado de la cita en formato badge (Pendiente, Confirmada, etc.) -->
-            <td class="align-middle">
-                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">
-                    {{ cita.get_estado_display }}
-                </span>
-            </td>
-
-            <!-- Columna de acciones: botones que aparecen en cada fila -->
-            <td class="align-middle text-end">
-
-                <!-- Botón Ver detalle: siempre visible, lleva a la página completa de la cita -->
-                <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-outline-dark btn-sm">Ver detalle</a>
-
-                <!-- Botón Reagendar: solo aparece si la cita está Pendiente o Confirmada -->
-                <!-- Lleva al formulario para cambiar fecha y hora -->
-                {% if cita.puede_reagendarse %}
-                <a href="{% url 'citas:reagendar_cita' cita.id %}" class="btn btn-outline-dark btn-sm">Reagendar</a>
-                {% endif %}
-
-                <!-- Botón Cancelar: solo aparece si la cita está Pendiente o Confirmada -->
-                <!-- Usa un formulario POST para mayor seguridad -->
-                <!-- d-inline hace que el formulario no ocupe toda la línea -->
-                {% if cita.puede_cancelarse %}
-                <form method="post" action="{% url 'citas:cancelar_cita' cita.id %}" class="d-inline">
-                    <!-- Token CSRF: protección obligatoria en formularios POST de Django -->
-                    {% csrf_token %}
-                    <!-- confirm() muestra una alerta preguntando si está seguro antes de cancelar -->
-                    <button type="submit" class="btn btn-outline-dark btn-sm" onclick="return confirm('¿Seguro que querés cancelar esta cita?')">Cancelar</button>
-                </form>
-                {% endif %}
-
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Mis citas</h2>
+    <a href="{% url 'citas:disponibilidad' %}" class="btn btn-outline-dark">Ver disponibilidad</a>
+</div>
 
 <!-- Si el cliente no tiene citas, mostrar mensaje -->
+{% if not activas and not canceladas %}
+<div class="text-center py-5">
+    <p class="text-muted mb-3">Todavía no tenés citas registradas.</p>
+    <a href="{% url 'citas:disponibilidad' %}" class="btn btn-dark">Agendá tu primera cita</a>
+</div>
 {% else %}
-<p class="text-muted">No tenés citas programadas. <a href="#">Agendá una ahora</a>.</p>
+
+<!-- Lista única de citas -->
+{% if activas %}
+<div class="table-responsive mb-5">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th class="text-muted fw-normal small">FECHA Y HORA</th>
+                <th class="text-muted fw-normal small">SERVICIO</th>
+                <th class="text-muted fw-normal small">MOTOCICLETA</th>
+                <th class="text-muted fw-normal small">ESTADO</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cita in activas %}
+            <tr>
+                <td>{{ cita.fecha }} · {{ cita.hora|time:"H:i" }}</td>
+                <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+                <td>{{ cita.motocicleta }}</td>
+                <td>
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                </td>
+                <td class="text-end">
+                    <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>
+                    {% if cita.puede_cancelarse %}
+                    <a href="{% url 'citas:reagendar_cita' cita.id %}" class="btn btn-sm btn-outline-dark">Reagendar</a>
+                    <form method="post" action="{% url 'citas:cancelar_cita' cita.id %}" class="d-inline"
+                          onsubmit="return confirm('¿Cancelar la cita #{{ cita.id }}?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-dark">Cancelar</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted mb-5">No tenés citas activas. <a href="{% url 'citas:disponibilidad' %}">Agendá una</a>.</p>
+{% endif %}
+
+<!-- Sección aparte de citas canceladas -->
+{% if canceladas %}
+<h5 class="mb-3 mt-5">Canceladas</h5>
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th class="text-muted fw-normal small">FECHA Y HORA</th>
+                <th class="text-muted fw-normal small">SERVICIO</th>
+                <th class="text-muted fw-normal small">MOTOCICLETA</th>
+                <th class="text-muted fw-normal small">ESTADO</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cita in canceladas %}
+            <tr>
+                <td>{{ cita.fecha }} · {{ cita.hora|time:"H:i" }}</td>
+                <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+                <td>{{ cita.motocicleta }}</td>
+                <td>
+                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                </td>
+                <td class="text-end">
+                    <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 {% endif %}
 
 {% endblock %}

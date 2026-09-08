@@ -1,0 +1,147 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Nuevo usuario · Taller{% endblock %}
+
+{% block content %}
+<p class="mb-2">
+    <a href="{% url 'usuarios:usuarios_lista' %}" class="text-decoration-none">&larr; Volver a usuarios</a>
+</p>
+
+<h1 class="h3 mb-4">Nuevo usuario del sistema</h1>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="row mb-3">
+        <label for="dui" class="col-sm-3 col-form-label">DUI</label>
+        <div class="col-sm-9">
+            <input type="text" id="dui" name="dui"
+                   class="form-control {% if errores.dui %}is-invalid{% endif %}"
+                   value="{{ datos.dui }}"
+                   placeholder="00000000-0"
+                   maxlength="10"
+                   data-mask="dui"
+                   inputmode="numeric">
+            {% if errores.dui %}
+                <div class="invalid-feedback">{{ errores.dui }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="nombre" class="col-sm-3 col-form-label">Nombre</label>
+        <div class="col-sm-9">
+            <input type="text" id="nombre" name="nombre"
+                   class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+                   value="{{ datos.nombre }}">
+            {% if errores.nombre %}
+                <div class="invalid-feedback">{{ errores.nombre }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="apellido" class="col-sm-3 col-form-label">Apellido</label>
+        <div class="col-sm-9">
+            <input type="text" id="apellido" name="apellido"
+                   class="form-control {% if errores.apellido %}is-invalid{% endif %}"
+                   value="{{ datos.apellido }}">
+            {% if errores.apellido %}
+                <div class="invalid-feedback">{{ errores.apellido }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="telefono" class="col-sm-3 col-form-label">Teléfono</label>
+        <div class="col-sm-9">
+            <input type="text" id="telefono" name="telefono"
+                   class="form-control {% if errores.telefono %}is-invalid{% endif %}"
+                   value="{{ datos.telefono }}"
+                   placeholder="0000-0000"
+                   maxlength="9"
+                   data-mask="telefono"
+                   inputmode="numeric">
+            {% if errores.telefono %}
+                <div class="invalid-feedback">{{ errores.telefono }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="email" class="col-sm-3 col-form-label">Correo</label>
+        <div class="col-sm-9">
+            <input type="email" id="email" name="email"
+                   class="form-control {% if errores.email %}is-invalid{% endif %}"
+                   value="{{ datos.email }}">
+            {% if errores.email %}
+                <div class="invalid-feedback">{{ errores.email }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="contrasena" class="col-sm-3 col-form-label">Contraseña inicial</label>
+        <div class="col-sm-9">
+            <input type="password" id="contrasena" name="contrasena"
+                   class="form-control {% if errores.contrasena %}is-invalid{% endif %}"
+                   autocomplete="new-password">
+            {% if errores.contrasena %}
+                <div class="invalid-feedback">{{ errores.contrasena }}</div>
+            {% endif %}
+            <small class="text-muted">Mínimo 8 caracteres.</small>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="rol" class="col-sm-3 col-form-label">Rol</label>
+        <div class="col-sm-9">
+            <select id="rol" name="rol"
+                    class="form-select {% if errores.rol %}is-invalid{% endif %}">
+                <option value="">Seleccioná un rol</option>
+                <option value="admin"    {% if datos.rol == 'admin'    %}selected{% endif %}>Administrador</option>
+                <option value="mecanico" {% if datos.rol == 'mecanico' %}selected{% endif %}>Mecánico</option>
+            </select>
+            {% if errores.rol %}
+                <div class="invalid-feedback">{{ errores.rol }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="campo-especialidad" class="row mb-3">
+        <label for="especialidad" class="col-sm-3 col-form-label">Especialidad</label>
+        <div class="col-sm-9">
+            <select id="especialidad" name="especialidad"
+                    class="form-select {% if errores.especialidad %}is-invalid{% endif %}">
+                <option value="">Seleccioná una especialidad</option>
+                {% for valor, etiqueta in especialidades %}
+                    <option value="{{ valor }}" {% if datos.especialidad == valor %}selected{% endif %}>
+                        {{ etiqueta }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if errores.especialidad %}
+                <div class="invalid-feedback">{{ errores.especialidad }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'usuarios:usuarios_lista' %}" class="btn btn-outline-dark">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Crear usuario</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleEspecialidad() {
+        var rol = document.getElementById('rol').value;
+        document.getElementById('campo-especialidad').style.display = rol === 'mecanico' ? '' : 'none';
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        toggleEspecialidad();
+        document.getElementById('rol').addEventListener('change', toggleEspecialidad);
+    });
+</script>
+{% endblock %}

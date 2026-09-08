@@ -137,6 +137,31 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # ---------------------------------------------------------------------------
+# Correo electrónico
+# ---------------------------------------------------------------------------
+# En desarrollo se usa la consola por defecto. Para realizar envíos reales,
+# EMAIL_BACKEND debe configurarse con el backend SMTP desde el archivo .env.
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.resend.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='resend')
+EMAIL_HOST_PASSWORD = config('RESEND_API_KEY', default='')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
+DEFAULT_FROM_EMAIL = config(
+    'DEFAULT_FROM_EMAIL',
+    default='Sistema del Taller <onboarding@resend.dev>',
+)
+TALLER_NOMBRE = config('TALLER_NOMBRE', default='Sistema del Taller')
+TALLER_TELEFONO = config('TALLER_TELEFONO', default='')
+TALLER_DIRECCION = config('TALLER_DIRECCION', default='')
+TALLER_EMAIL_CONTACTO = config('TALLER_EMAIL_CONTACTO', default='')
+
+
+# ---------------------------------------------------------------------------
 # Default primary key field type
 # ---------------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

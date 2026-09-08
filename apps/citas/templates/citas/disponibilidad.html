@@ -1,0 +1,88 @@
+{% extends "core/base.html" %}
+{# SCRUM-33: el cliente o el admin consulta qué slots están libres para una fecha y servicio. #}
+
+{% block title %}Disponibilidad de citas — Taller de Motos{% endblock %}
+
+{% block content %}
+<p class="text-muted small mb-1">CITAS</p>
+<h2 class="mb-4">Consultar disponibilidad</h2>
+
+{# form GET (no POST): los params quedan en la URL y se pueden compartir o recargar #}
+<form method="get" action="{% url 'citas:disponibilidad' %}" class="row g-3 mb-4">
+    <div class="col-md-4">
+        <label for="fecha" class="form-label">Fecha</label>
+        {# min="{{ hoy }}" bloquea fechas pasadas en el calendario nativo del navegador #}
+        <input type="date" name="fecha" id="fecha" class="form-control"
+               value="{{ fecha_str }}" min="{{ hoy }}" required>
+    </div>
+    <div class="col-md-5">
+        <label for="servicio" class="form-label">Servicio</label>
+        <select name="servicio" id="servicio" class="form-select" required>
+            <option value="">Elegí un servicio…</option>
+            {% for s in servicios %}
+            {# stringformat:"s" convierte el id (int) a str para comparar con el value que vino por GET #}
+            <option value="{{ s.id }}" {% if servicio_id == s.id|stringformat:"s" %}selected{% endif %}>
+                {{ s.nombre }} — {{ s.duracion_display }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <button type="submit" class="btn btn-dark w-100">Consultar</button>
+    </div>
+</form>
+
+{# error: la consulta falló por params inválidos o falta de config (sin horario, sin mecánicos) #}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{# mensaje: la consulta fue válida pero ese día el taller no atiende #}
+{% if mensaje %}
+<div class="alert alert-warning">{{ mensaje }}</div>
+{% endif %}
+
+{# slots: solo se setean cuando todo validó bien y hay horarios para mostrar #}
+{% if slots %}
+<div class="mb-3">
+    <p class="mb-1"><strong>{{ fecha }}</strong> — {{ servicio.nombre }} ({{ servicio.duracion_display }})</p>
+    <p class="text-muted small mb-0">
+        Horario: {{ horario.hora_apertura|time:"H:i" }} a {{ horario.hora_cierre|time:"H:i" }} ·
+        Capacidad por slot: {{ capacidad }} mecánico{{ capacidad|pluralize }}
+    </p>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th class="text-muted fw-normal small">HORA</th>
+            <th class="text-muted fw-normal small">OCUPACIÓN</th>
+            <th class="text-muted fw-normal small">ESTADO</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for slot in slots %}
+        <tr>
+            <td class="align-middle">{{ slot.hora|time:"H:i" }}</td>
+            <td class="align-middle">{{ slot.ocupados }} / {{ slot.capacidad }}</td>
+            <td class="align-middle">
+                {% if slot.libre %}
+                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Libre</span>
+                {% else %}
+                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Lleno</span>
+                {% endif %}
+            </td>
+            <td class="align-middle text-end">
+                {# botón "Agendar" solo aparece para clientes y solo en slots libres — el admin solo consulta #}
+                {% if slot.libre and user.is_cliente %}
+                <a href="{% url 'citas:agendar_cita' %}?fecha={{ fecha|date:'Y-m-d' }}&hora={{ slot.hora|time:'H:i' }}&servicio={{ servicio.id }}"
+                   class="btn btn-sm btn-dark">Agendar</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
