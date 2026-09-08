@@ -15,6 +15,7 @@ from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
 from .models import Cita, CambioEstadoCita, RepuestoUsado, ServicioCita
+from .totales import calcular_detalle_cita, precio_valido
 from .services import (
     notificar_cita_agendada,
     notificar_cita_cancelada,
@@ -256,6 +257,9 @@ def cita_detalle(request, cita_id):
     return render(request, 'citas/cita_detalle.html', {
         'cita': cita,
         'servicios': servicios,
+        'detalle_economico': (
+            calcular_detalle_cita(cita) if cita.estado == Cita.ESTADO_COMPLETADA else None
+        ),
     })
 
 
@@ -619,8 +623,11 @@ def cita_admin_detalle(request, cita_id):
             observaciones_cierre = request.POST.get('observaciones_cierre', '').strip()
 
             repuestos_validados = []
-            errores_repuestos = []
+            errores_repuestos = list(calcular_detalle_cita(cita)['errores'])
             productos_vistos = set()
+
+            if len(productos_ids) != len(cantidades):
+                errores_repuestos.append('Completá producto y cantidad en cada fila que agregues.')
 
             for producto_id, cantidad_str in zip(productos_ids, cantidades):
                 producto_id = producto_id.strip()
@@ -653,6 +660,10 @@ def cita_admin_detalle(request, cita_id):
                     continue
                 productos_vistos.add(producto.id)
 
+                if not precio_valido(producto.precio):
+                    errores_repuestos.append(f'El repuesto "{producto.nombre}" no tiene un precio válido.')
+                    continue
+
                 if cantidad > producto.stock_actual:
                     errores_repuestos.append(
                         f'No hay stock suficiente de "{producto.nombre}" '
@@ -673,6 +684,7 @@ def cita_admin_detalle(request, cita_id):
                         cita=cita,
                         producto=producto,
                         cantidad=cantidad,
+                        precio_unitario=producto.precio,
                     )
                     producto.stock_actual = producto.stock_actual - cantidad
                     producto.save(update_fields=['stock_actual'])
@@ -716,6 +728,7 @@ def cita_admin_detalle(request, cita_id):
         'puede_finalizar': puede_finalizar,
         'productos_disponibles': productos_disponibles,
         'repuestos_usados': cita.repuestos_usados.select_related('producto').all(),
+        'detalle_economico': calcular_detalle_cita(cita),
     })
 
 

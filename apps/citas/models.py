@@ -100,6 +100,10 @@ class RepuestoUsado(models.Model):
     cita = models.ForeignKey(Cita, on_delete=models.PROTECT, related_name='repuestos_usados')
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='usos_en_citas')
     cantidad = models.PositiveIntegerField()
+    precio_unitario = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text='Precio aplicado al cerrar. Vacío en consumos anteriores sin precio histórico.',
+    )
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     class Meta:
