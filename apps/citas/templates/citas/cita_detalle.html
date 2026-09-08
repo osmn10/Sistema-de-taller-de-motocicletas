@@ -1,47 +1,58 @@
-﻿{% extends 'core/base.html' %}
+﻿<!-- Hereda el diseño base del sistema (navbar, footer, estilos) -->
+{% extends 'core/base.html' %}
 
+<!-- Título que aparece en la pestaña del navegador -->
 {% block title %}Cita — Taller{% endblock %}
 
+<!-- Contenido principal de la página -->
 {% block content %}
 
-{% if request.user.is_admin %}
-<a href="{% url 'citas:calendario' %}" class="text-decoration-none text-muted small">‹ Volver al calendario</a>
-{% else %}
+<!-- Link para volver a la lista de citas del cliente -->
 <a href="{% url 'citas:mis_citas' %}" class="text-decoration-none text-muted small">‹ Volver a mis citas</a>
-{% endif %}
 
+<!-- Encabezado: número de cita + badge con el estado actual -->
 <div class="mt-3 mb-4 d-flex align-items-center gap-3">
     <h2 class="mb-0">Cita #{{ cita.id }}</h2>
+    <!-- get_estado_display convierte 'pendiente' en 'Pendiente' (versión legible) -->
     <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
 </div>
 
+<!-- Sección: Fecha y hora de la cita -->
 <p class="text-muted small mb-1">FECHA Y HORA</p>
 <p class="mb-4">{{ cita.fecha }} · {{ cita.hora }}</p>
 
+<!-- Sección: Motocicleta asociada a la cita -->
 <p class="text-muted small mb-1">MOTOCICLETA</p>
 <p class="mb-4">{{ cita.motocicleta }}</p>
 
+<!-- Sección: Lista de servicios solicitados en esta cita -->
 <p class="text-muted small mb-1">SERVICIOS SOLICITADOS</p>
+<!-- Recorre cada servicio asociado a la cita mediante la tabla ServicioCita -->
 {% for sc in servicios %}
     <div class="border rounded p-3 mb-2">{{ sc.servicio.nombre }}</div>
 {% empty %}
+    <!-- Se muestra si no hay servicios asociados a la cita -->
     <p class="text-muted">Sin servicios.</p>
 {% endfor %}
 
-{% if request.user.is_cliente %}
+<!-- Botones de acción: solo se muestran si la cita puede reagendarse o cancelarse -->
 {% if cita.puede_reagendarse or cita.puede_cancelarse %}
 <div class="d-flex gap-2 mt-4">
+
+    <!-- Botón Reagendar: lleva al formulario para cambiar fecha y hora -->
     {% if cita.puede_reagendarse %}
     <a href="{% url 'citas:reagendar_cita' cita.id %}" class="btn btn-outline-dark">Reagendar</a>
     {% endif %}
+
+    <!-- Botón Cancelar: envía un POST para cambiar el estado a Cancelada -->
     {% if cita.puede_cancelarse %}
     <form method="post" action="{% url 'citas:cancelar_cita' cita.id %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-dark" onclick="return confirm('¿Seguro que querés cancelar esta cita?')">Cancelar cita</button>
     </form>
     {% endif %}
+
 </div>
-{% endif %}
 {% endif %}
 
 {% endblock %}

@@ -17,10 +17,7 @@ def mis_citas(request):
 
 @login_required(login_url='usuarios:login')
 def cita_detalle(request, cita_id):
-    if request.user.is_admin:
-        cita = get_object_or_404(Cita, id=cita_id)
-    else:
-        cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
+    cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
     servicios = cita.serviciocita_set.select_related('servicio').all()
     return render(request, 'citas/cita_detalle.html', {
         'cita': cita,
