@@ -14,7 +14,7 @@ DEBUG = False
 
 
 # ---------------------------------------------------------------------------
-# Base de datos: PostgreSQL vía DATABASE_URL
+# Base de datos: PostgreSQL vía DATABASE_URL (Neon.tech)
 # ---------------------------------------------------------------------------
 DATABASES = {
     'default': dj_database_url.config(
@@ -22,6 +22,21 @@ DATABASES = {
         conn_max_age=600,
         ssl_require=True,
     )
+}
+
+
+# ---------------------------------------------------------------------------
+# Archivos estáticos: WhiteNoise (sin servidor web aparte)
+# ---------------------------------------------------------------------------
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    *MIDDLEWARE[1:],
+]
+
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
 
 

@@ -11,5 +11,11 @@ django-bootstrap5>=24.2
 # Manejo de imágenes (ImageField)
 Pillow>=10.0
 
-# Driver PostgreSQL (descomentar al desplegar a producción)
-# psycopg2-binary>=2.9
+# Driver PostgreSQL (producción, Neon.tech)
+psycopg2-binary>=2.9
+
+# Servidor WSGI de producción
+gunicorn>=22.0
+
+# Servir archivos estáticos en producción sin servidor web aparte
+whitenoise>=6.7
