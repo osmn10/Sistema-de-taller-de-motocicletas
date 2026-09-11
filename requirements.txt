@@ -13,3 +13,6 @@ Pillow>=10.0
 
 # Driver PostgreSQL (descomentar al desplegar a producción)
 # psycopg2-binary>=2.9
+
+# Generación de PDF (ticket de servicio, V2SCRUM-30)
+reportlab>=4.0
