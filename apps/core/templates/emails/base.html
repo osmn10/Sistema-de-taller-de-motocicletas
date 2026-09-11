@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block titulo %}{{ taller_nombre }}{% endblock %}</title>
+</head>
+<body style="margin:0; padding:0; background:#f4f4f5; color:#27272a; font-family:Arial, Helvetica, sans-serif;">
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
+        {% block preencabezado %}{% endblock %}
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f4f5; padding:32px 12px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px; background:#ffffff; border:1px solid #e4e4e7; border-radius:12px; overflow:hidden;">
+                    <tr>
+                        <td style="background:#18181b; color:#ffffff; padding:24px 32px;">
+                            <div style="font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:#d4d4d8;">Notificación</div>
+                            <div style="font-size:22px; font-weight:700; margin-top:6px;">{{ taller_nombre }}</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:32px; line-height:1.6;">
+                            {% block contenido %}{% endblock %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background:#fafafa; border-top:1px solid #e4e4e7; padding:20px 32px; color:#71717a; font-size:12px; line-height:1.6;">
+                            <strong>{{ taller_nombre }}</strong>
+                            {% if taller_direccion %}<br>{{ taller_direccion }}{% endif %}
+                            {% if taller_telefono %}<br>Teléfono: {{ taller_telefono }}{% endif %}
+                            {% if taller_email_contacto %}<br>Correo: {{ taller_email_contacto }}{% endif %}
+                            <br>Este es un mensaje automático; no compartas información confidencial al responder.
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

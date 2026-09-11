@@ -11,6 +11,11 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('registro/', views.registro_cliente, name='registro_cliente'),
+
+    # V2SCRUM-34 · Recuperación de contraseña por correo
+    path('password/recuperar/', views.password_reset_solicitar, name='password_reset_solicitar'),
+    path('password/nueva/<uidb64>/<token>/', views.password_reset_confirmar, name='password_reset_confirmar'),
+
     path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
     path('clientes/', views.clientes_lista, name='clientes_lista'),
     path('clientes/<str:dui>/', views.cliente_detalle, name='cliente_detalle'),

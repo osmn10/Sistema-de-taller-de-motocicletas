@@ -5,6 +5,7 @@ from django.db import models
 from apps.usuarios.models import Cliente, Mecanico
 from apps.vehiculos.models import Motocicleta
 from apps.servicios.models import Servicio
+from apps.productos.models import Producto
 
 
 class Cita(models.Model):
@@ -32,6 +33,11 @@ class Cita(models.Model):
     hora         = models.TimeField()
     estado       = models.CharField(max_length=20, choices=ESTADOS, default=ESTADO_PENDIENTE)
     observaciones = models.TextField(blank=True)
+    observaciones_cierre = models.TextField(
+        blank=True,
+        verbose_name='Observaciones de cierre',
+        help_text='Notas del administrador al finalizar el servicio (V2SCRUM-24).',
+    )
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -82,3 +88,28 @@ class CambioEstadoCita(models.Model):
 
     def __str__(self):
         return f'Cita #{self.cita.id}: {self.estado_anterior} -> {self.estado_nuevo}'
+
+
+class RepuestoUsado(models.Model):
+    """Repuesto/producto de inventario consumido al finalizar el servicio de una cita.
+
+    V2SCRUM-24: registra qué y cuánto se usó, y sirve de base para descontar
+    el stock del producto correspondiente al finalizar la cita.
+    """
+
+    cita = models.ForeignKey(Cita, on_delete=models.PROTECT, related_name='repuestos_usados')
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='usos_en_citas')
+    cantidad = models.PositiveIntegerField()
+    precio_unitario = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text='Precio aplicado al cerrar. Vacío en consumos anteriores sin precio histórico.',
+    )
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('cita', 'producto')]
+        verbose_name = 'Repuesto usado'
+        verbose_name_plural = 'Repuestos usados'
+
+    def __str__(self):
+        return f'{self.cantidad} x {self.producto.nombre} — Cita #{self.cita.id}'
