@@ -21,6 +21,7 @@ from .ticket_pdf import generar_ticket_pdf
 from .services import (
     notificar_cita_agendada,
     notificar_cita_cancelada,
+    notificar_cita_completada,
     notificar_cita_confirmada,
     notificar_cita_reagendada,
 )
@@ -729,9 +730,12 @@ def cita_admin_detalle(request, cita_id):
                 cita.observaciones_cierre = observaciones_cierre
                 cita.save(update_fields=['estado', 'observaciones_cierre'])
 
-                # V2SCRUM-33 (correo de cierre con el ticket adjunto) se
-                # engancha acá con transaction.on_commit(...), una vez que
-                # exista notificar_cita_completada en services.py.
+                # V2SCRUM-33: correo de cierre con el ticket PDF adjunto
+                # (V2SCRUM-30). Se dispara después de que la transacción de
+                # finalización (repuestos, inventario, estado) se confirmó.
+                transaction.on_commit(
+                    lambda cita_id=cita.id: notificar_cita_completada(cita_id)
+                )
 
             messages.success(
                 request,

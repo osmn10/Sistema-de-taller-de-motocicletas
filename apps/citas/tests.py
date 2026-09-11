@@ -14,6 +14,7 @@ from .models import Cita, RepuestoUsado, ServicioCita
 from .services import (
     notificar_cita_agendada,
     notificar_cita_cancelada,
+    notificar_cita_completada,
     notificar_cita_confirmada,
     notificar_cita_reagendada,
 )
@@ -524,3 +525,51 @@ class TicketYCorreoCierreTests(TestCase):
         respuesta = self.client.get(reverse('citas:descargar_ticket', args=[cita.id]))
 
         self.assertEqual(respuesta.status_code, 404)
+
+    # --- V2SCRUM-33: correo de cierre ---
+
+    def test_finalizar_dispara_correo_de_cierre_con_pdf_adjunto(self):
+        cita = self.crear_cita_en_proceso()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita)
+        cita.refresh_from_db()
+
+        self.assertEqual(len(mail.outbox), 1)
+        mensaje = mail.outbox[0]
+        self.assertEqual(mensaje.to, ['laura@example.com'])
+        self.assertIn(f'Cita #{cita.id} completada', mensaje.subject)
+
+        self.assertEqual(len(mensaje.attachments), 1)
+        nombre_adjunto, contenido, tipo_mime = mensaje.attachments[0]
+        self.assertEqual(nombre_adjunto, f'ticket_cita_{cita.id}.pdf')
+        self.assertEqual(tipo_mime, 'application/pdf')
+        self.assertTrue(contenido.startswith(b'%PDF'))
+
+        contenido_html, _ = mensaje.alternatives[0]
+        self.assertIn('Cambio de aceite', contenido_html)
+        self.assertIn('Aceite 10W-40', contenido_html)
+        from django.template.defaultfilters import floatformat
+        total_esperado = floatformat(calcular_detalle_cita(cita)['total_referencia'], 2)
+        self.assertIn(total_esperado, contenido_html)
+
+    @patch('apps.citas.views.notificar_cita_completada')
+    def test_finalizar_llama_a_notificar_cita_completada_tras_guardar(self, notificar):
+        cita = self.crear_cita_en_proceso()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita)
+
+        notificar.assert_called_once_with(cita.id)
+
+    def test_notificar_cita_completada_devuelve_true(self):
+        cita = self.crear_cita_en_proceso()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita, producto_id=[''], cantidad=[''])
+        cita.refresh_from_db()
+        mail.outbox.clear()
+
+        resultado = notificar_cita_completada(cita.id)
+
+        self.assertTrue(resultado)
+        self.assertEqual(len(mail.outbox), 1)
