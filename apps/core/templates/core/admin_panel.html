@@ -7,6 +7,14 @@
 
 <div class="row g-3">
     <div class="col-md-4">
+        <a href="{% url 'core:dashboard' %}" class="card text-decoration-none text-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Dashboard</h5>
+                <p class="card-text text-muted small">KPIs del taller y alerta de stock bajo.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
         <a href="{% url 'citas:calendario' %}" class="card text-decoration-none text-dark h-100">
             <div class="card-body">
                 <h5 class="card-title">Citas</h5>
