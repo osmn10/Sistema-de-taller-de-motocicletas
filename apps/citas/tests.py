@@ -14,9 +14,12 @@ from .models import Cita, RepuestoUsado, ServicioCita
 from .services import (
     notificar_cita_agendada,
     notificar_cita_cancelada,
+    notificar_cita_completada,
     notificar_cita_confirmada,
     notificar_cita_reagendada,
 )
+from .totales import calcular_detalle_cita
+from .ticket_pdf import generar_ticket_pdf
 
 
 @override_settings(
@@ -411,3 +414,162 @@ class FinalizarServicioTests(TestCase):
         self.producto.refresh_from_db()
         self.assertEqual(cita.estado, Cita.ESTADO_EN_PROCESO)
         self.assertEqual(self.producto.stock_actual, 10)
+
+
+class TicketYCorreoCierreTests(TestCase):
+    """V2SCRUM-30 (ticket PDF) y V2SCRUM-33 (correo de cierre con adjunto)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.cliente = Usuario.objects.create_cliente(
+            dui='11122233-1', password='cliente123', nombre='Laura', apellido='Reyes',
+            telefono='7000-1111', email='laura@example.com', direccion='Santa Ana',
+        )
+        cls.admin = Usuario.objects.create_admin(
+            dui='11122233-2', password='admin123', nombre='Ana', apellido='Admin',
+            telefono='7000-2222', email='ana-admin@example.com',
+        )
+        cls.mecanico = Usuario.objects.create_mecanico(
+            dui='11122233-3', password='mecanico123', nombre='Beto', apellido='Mecánico',
+            telefono='7000-3333', email='beto@example.com',
+            especialidad=Mecanico.ESPECIALIDAD_MECANICA_GENERAL,
+        )
+        cls.motocicleta = Motocicleta.objects.create(
+            placa='M-7777', cliente=cls.cliente, marca='Honda', modelo='CB 190',
+            anio=2022, color='Rojo',
+        )
+        cls.servicio = Servicio.objects.create(
+            nombre='Cambio de aceite', precio_base='25.00', duracion_estimada=30,
+        )
+
+    def setUp(self):
+        self.producto = Producto.objects.create(
+            nombre='Aceite 10W-40', precio='9.50', stock_actual=15, stock_minimo=2,
+        )
+
+    def crear_cita_en_proceso(self):
+        cita = Cita.objects.create(
+            cliente=self.cliente,
+            motocicleta=self.motocicleta,
+            mecanico=self.mecanico,
+            fecha=date.today(),
+            hora=time(10, 0),
+            estado=Cita.ESTADO_EN_PROCESO,
+        )
+        ServicioCita.objects.create(
+            cita=cita, servicio=self.servicio, precio_final=self.servicio.precio_base,
+        )
+        return cita
+
+    def finalizar(self, cita, **extra):
+        datos = {
+            'accion': 'finalizar_servicio',
+            'producto_id': [str(self.producto.id)],
+            'cantidad': ['2'],
+            'observaciones_cierre': 'Todo en orden.',
+        }
+        datos.update(extra)
+        self.client.force_login(self.admin)
+        return self.client.post(
+            reverse('citas:cita_admin_detalle', args=[cita.id]), datos,
+        )
+
+    # --- V2SCRUM-30: generación del PDF ---
+
+    def test_generar_ticket_pdf_devuelve_bytes_con_encabezado_pdf(self):
+        cita = self.crear_cita_en_proceso()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita)
+        cita.refresh_from_db()
+
+        detalle = calcular_detalle_cita(cita)
+        pdf_bytes = generar_ticket_pdf(cita, detalle)
+
+        self.assertTrue(pdf_bytes.startswith(b'%PDF'))
+        self.assertGreater(len(pdf_bytes), 100)
+
+    def test_descargar_ticket_requiere_cita_completada(self):
+        cita = self.crear_cita_en_proceso()  # todavía en proceso, no completada
+        self.client.force_login(self.cliente)
+
+        respuesta = self.client.get(reverse('citas:descargar_ticket', args=[cita.id]))
+
+        self.assertEqual(respuesta.status_code, 302)
+
+    def test_descargar_ticket_funciona_para_cita_completada(self):
+        cita = self.crear_cita_en_proceso()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita)
+        cita.refresh_from_db()
+        self.client.force_login(self.cliente)
+
+        respuesta = self.client.get(reverse('citas:descargar_ticket', args=[cita.id]))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta['Content-Type'], 'application/pdf')
+        self.assertIn(f'ticket_cita_{cita.id}.pdf', respuesta['Content-Disposition'])
+        self.assertTrue(respuesta.content.startswith(b'%PDF'))
+
+    def test_descargar_ticket_no_permite_ver_cita_de_otro_cliente(self):
+        cita = self.crear_cita_en_proceso()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita)
+        cita.refresh_from_db()
+
+        otro_cliente = Usuario.objects.create_cliente(
+            dui='11122233-4', password='x', nombre='Otro', apellido='Cliente',
+            telefono='7000-4444', email='otro@example.com', direccion='SS',
+        )
+        self.client.force_login(otro_cliente)
+
+        respuesta = self.client.get(reverse('citas:descargar_ticket', args=[cita.id]))
+
+        self.assertEqual(respuesta.status_code, 404)
+
+    # --- V2SCRUM-33: correo de cierre ---
+
+    def test_finalizar_dispara_correo_de_cierre_con_pdf_adjunto(self):
+        cita = self.crear_cita_en_proceso()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita)
+        cita.refresh_from_db()
+
+        self.assertEqual(len(mail.outbox), 1)
+        mensaje = mail.outbox[0]
+        self.assertEqual(mensaje.to, ['laura@example.com'])
+        self.assertIn(f'Cita #{cita.id} completada', mensaje.subject)
+
+        self.assertEqual(len(mensaje.attachments), 1)
+        nombre_adjunto, contenido, tipo_mime = mensaje.attachments[0]
+        self.assertEqual(nombre_adjunto, f'ticket_cita_{cita.id}.pdf')
+        self.assertEqual(tipo_mime, 'application/pdf')
+        self.assertTrue(contenido.startswith(b'%PDF'))
+
+        contenido_html, _ = mensaje.alternatives[0]
+        self.assertIn('Cambio de aceite', contenido_html)
+        self.assertIn('Aceite 10W-40', contenido_html)
+        from django.template.defaultfilters import floatformat
+        total_esperado = floatformat(calcular_detalle_cita(cita)['total_referencia'], 2)
+        self.assertIn(total_esperado, contenido_html)
+
+    @patch('apps.citas.views.notificar_cita_completada')
+    def test_finalizar_llama_a_notificar_cita_completada_tras_guardar(self, notificar):
+        cita = self.crear_cita_en_proceso()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita)
+
+        notificar.assert_called_once_with(cita.id)
+
+    def test_notificar_cita_completada_devuelve_true(self):
+        cita = self.crear_cita_en_proceso()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.finalizar(cita, producto_id=[''], cantidad=[''])
+        cita.refresh_from_db()
+        mail.outbox.clear()
+
+        resultado = notificar_cita_completada(cita.id)
+
+        self.assertTrue(resultado)
+        self.assertEqual(len(mail.outbox), 1)

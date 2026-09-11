@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -16,9 +17,11 @@ from apps.vehiculos.models import Motocicleta
 
 from .models import Cita, CambioEstadoCita, RepuestoUsado, ServicioCita
 from .totales import calcular_detalle_cita, precio_valido
+from .ticket_pdf import generar_ticket_pdf
 from .services import (
     notificar_cita_agendada,
     notificar_cita_cancelada,
+    notificar_cita_completada,
     notificar_cita_confirmada,
     notificar_cita_reagendada,
 )
@@ -261,6 +264,33 @@ def cita_detalle(request, cita_id):
             calcular_detalle_cita(cita) if cita.estado == Cita.ESTADO_COMPLETADA else None
         ),
     })
+
+
+@login_required(login_url='usuarios:login')
+def descargar_ticket(request, cita_id):
+    """V2SCRUM-30. Descarga del ticket PDF desde el historial del cliente.
+
+    El PDF se genera al vuelo a partir de las líneas guardadas de la cita
+    (misma fuente que el correo de cierre), no se persiste en disco/BD.
+    """
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden descargar su ticket.')
+        return redirect('core:home')
+
+    cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
+    if cita.estado != Cita.ESTADO_COMPLETADA:
+        messages.error(request, 'El ticket solo está disponible para citas completadas.')
+        return redirect('citas:cita_detalle', cita_id=cita.id)
+
+    detalle = calcular_detalle_cita(cita)
+    if detalle['errores']:
+        messages.error(request, 'No fue posible generar el ticket: ' + '; '.join(detalle['errores']))
+        return redirect('citas:cita_detalle', cita_id=cita.id)
+
+    pdf_bytes = generar_ticket_pdf(cita, detalle)
+    respuesta = HttpResponse(pdf_bytes, content_type='application/pdf')
+    respuesta['Content-Disposition'] = f'attachment; filename="ticket_cita_{cita.id}.pdf"'
+    return respuesta
 
 
 @login_required(login_url='usuarios:login')
@@ -700,11 +730,12 @@ def cita_admin_detalle(request, cita_id):
                 cita.observaciones_cierre = observaciones_cierre
                 cita.save(update_fields=['estado', 'observaciones_cierre'])
 
-                # V2SCRUM-30 (ticket PDF) y V2SCRUM-33 (correo de cierre)
-                # dependen del cálculo de detalle/total (V2SCRUM-27) y del
-                # PDF ya generado. Cuando ambos estén listos, este es el
-                # lugar donde se enganchan con transaction.on_commit(...),
-                # igual que notificar_cita_confirmada arriba.
+                # V2SCRUM-33: correo de cierre con el ticket PDF adjunto
+                # (V2SCRUM-30). Se dispara después de que la transacción de
+                # finalización (repuestos, inventario, estado) se confirmó.
+                transaction.on_commit(
+                    lambda cita_id=cita.id: notificar_cita_completada(cita_id)
+                )
 
             messages.success(
                 request,

@@ -1,5 +1,6 @@
 """Lógica de negocio (services) para la gestión de citas."""
 
+import logging
 from datetime import date, time
 
 from django.conf import settings
@@ -7,6 +8,11 @@ from django.conf import settings
 from apps.core.emails import enviar_correo_html
 
 from .models import Cita
+from .totales import calcular_detalle_cita
+from .ticket_pdf import generar_ticket_pdf
+
+
+logger = logging.getLogger(__name__)
 
 
 def _cita_con_detalles(cita_id: int) -> tuple[Cita, list]:
@@ -51,14 +57,12 @@ def notificar_cita_cancelada(cita_id: int) -> bool:
     """Confirma al cliente que su cita quedó cancelada."""
 
     cita, servicios = _cita_con_detalles(cita_id)
-    resultado = enviar_correo_html(
+    return enviar_correo_html(
         asunto=f'Cita #{cita.id} cancelada - {settings.TALLER_NOMBRE}',
         plantilla='emails/citas/cita_cancelada.html',
         contexto={'cita': cita, 'servicios': servicios},
         destinatarios=[cita.cliente.email],
     )
-    print(f'[DEBUG] notificar_cita_cancelada(cita_id={cita_id}) -> {resultado}')
-    return resultado
 
 
 def notificar_cita_reagendada(
@@ -69,7 +73,7 @@ def notificar_cita_reagendada(
     """Informa al cliente el cambio de fecha/hora de una cita existente."""
 
     cita, servicios = _cita_con_detalles(cita_id)
-    resultado = enviar_correo_html(
+    return enviar_correo_html(
         asunto=f'Cita #{cita.id} reagendada - {settings.TALLER_NOMBRE}',
         plantilla='emails/citas/cita_reagendada.html',
         contexto={
@@ -80,5 +84,34 @@ def notificar_cita_reagendada(
         },
         destinatarios=[cita.cliente.email],
     )
-    print(f'[DEBUG] notificar_cita_reagendada(cita_id={cita_id}) -> {resultado}')
-    return resultado
+
+
+def notificar_cita_completada(cita_id: int) -> bool:
+    """V2SCRUM-33: envía el correo de cierre con el ticket PDF adjunto.
+
+    Usa la misma fuente de verdad que el ticket y el historial del cliente
+    (``calcular_detalle_cita``, V2SCRUM-27). Si por algún motivo el total no
+    se puede calcular con confianza (``errores`` no vacío), no se envía un
+    monto definitivo: se registra y se omite el envío, sin bloquear el
+    cierre de la cita, que ya ocurrió antes de llamar a esta función.
+    """
+
+    cita, servicios = _cita_con_detalles(cita_id)
+    detalle = calcular_detalle_cita(cita)
+
+    if detalle['errores']:
+        logger.error(
+            'No se envía el correo de cierre de la cita #%s: %s',
+            cita_id, '; '.join(detalle['errores']),
+        )
+        return False
+
+    pdf_bytes = generar_ticket_pdf(cita, detalle)
+
+    return enviar_correo_html(
+        asunto=f'Cita #{cita.id} completada - {settings.TALLER_NOMBRE}',
+        plantilla='emails/citas/cita_completada.html',
+        contexto={'cita': cita, 'servicios': servicios, 'detalle': detalle},
+        destinatarios=[cita.cliente.email],
+        adjuntos=[(f'ticket_cita_{cita.id}.pdf', pdf_bytes, 'application/pdf')],
+    )
