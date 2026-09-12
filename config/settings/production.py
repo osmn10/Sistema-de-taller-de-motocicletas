@@ -12,6 +12,13 @@ from .base import *  # noqa: F401,F403
 
 DEBUG = False
 
+# En producción SMTP es el valor por defecto, salvo override del entorno. La clave se
+# configura en el panel del hosting mediante RESEND_API_KEY.
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.smtp.EmailBackend',
+)
+
 
 # ---------------------------------------------------------------------------
 # Base de datos: PostgreSQL vía DATABASE_URL (Neon.tech)
