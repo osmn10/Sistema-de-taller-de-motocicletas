@@ -31,7 +31,7 @@ class Command(BaseCommand):
         )
         if backend_smtp and not settings.EMAIL_HOST_PASSWORD:
             raise CommandError(
-                'Falta RESEND_API_KEY en el archivo .env. No se intentó el envío.'
+                'Falta EMAIL_HOST_PASSWORD en el archivo .env. No se intentó el envío.'
             )
 
         try:

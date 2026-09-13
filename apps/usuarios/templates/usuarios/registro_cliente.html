@@ -113,11 +113,14 @@
             <div class="row mb-3 align-items-start">
                 <label for="contrasena" class="col-sm-3 col-form-label">Contraseña</label>
                 <div class="col-sm-9">
-                    <input type="password" id="contrasena" name="contrasena"
-                           class="form-control {% if errores.contrasena %}is-invalid{% endif %}"
-                           placeholder="••••••••">
+                    <div class="input-group">
+                        <input type="password" id="contrasena" name="contrasena"
+                               class="form-control {% if errores.contrasena %}is-invalid{% endif %}"
+                               placeholder="••••••••">
+                        {% include "core/_pw_toggle_boton.html" with input_id="contrasena" %}
+                    </div>
                     {% if errores.contrasena %}
-                        <div class="invalid-feedback">{{ errores.contrasena }}</div>
+                        <div class="invalid-feedback d-block">{{ errores.contrasena }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -126,11 +129,14 @@
             <div class="row mb-3 align-items-start">
                 <label for="confirmar" class="col-sm-3 col-form-label">Confirmar</label>
                 <div class="col-sm-9">
-                    <input type="password" id="confirmar" name="confirmar"
-                           class="form-control {% if errores.confirmar %}is-invalid{% endif %}"
-                           placeholder="••••••••">
+                    <div class="input-group">
+                        <input type="password" id="confirmar" name="confirmar"
+                               class="form-control {% if errores.confirmar %}is-invalid{% endif %}"
+                               placeholder="••••••••">
+                        {% include "core/_pw_toggle_boton.html" with input_id="confirmar" %}
+                    </div>
                     {% if errores.confirmar %}
-                        <div class="invalid-feedback">{{ errores.confirmar }}</div>
+                        <div class="invalid-feedback d-block">{{ errores.confirmar }}</div>
                     {% endif %}
                 </div>
             </div>
