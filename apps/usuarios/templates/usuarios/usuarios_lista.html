@@ -54,16 +54,16 @@
                 <td>{{ u.email }}</td>
                 <td>
                     {% if u.is_admin %}
-                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Administrador</span>
+                        <span class="badge rounded-pill status-badge status-on-cyan px-3 py-2">Administrador</span>
                     {% else %}
-                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Mecánico</span>
+                        <span class="badge rounded-pill status-badge status-en_proceso px-3 py-2">Mecánico</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if u.activo %}
-                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activo</span>
+                        <span class="badge rounded-pill status-badge status-on px-3 py-2">Activo</span>
                     {% else %}
-                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactivo</span>
+                        <span class="badge rounded-pill status-badge status-off px-3 py-2">Inactivo</span>
                     {% endif %}
                 </td>
                 <td class="text-end">

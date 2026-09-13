@@ -3,11 +3,31 @@
 {% block title %}Panel del mecánico · Taller{% endblock %}
 
 {% block content %}
+<p class="eyebrow mb-1">estación de trabajo</p>
 <h1 class="h3 mb-4">Panel del mecánico</h1>
 
-<div class="card">
-    <div class="card-body text-center text-muted py-5">
-        <p class="mb-0">En construcción</p>
+<div class="row g-3">
+    <div class="col-md-6">
+        <a href="{% url 'citas:mis_citas_mecanico' %}" class="card dashboard-card text-decoration-none h-100">
+            <div class="card-body">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>
+                <div>
+                    <h5 class="card-title">Mis citas</h5>
+                    <p class="card-text small">Citas programadas del taller y su estado.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6">
+        <a href="{% url 'usuarios:mi_perfil' %}" class="card dashboard-card text-decoration-none h-100">
+            <div class="card-body">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span>
+                <div>
+                    <h5 class="card-title">Mi perfil</h5>
+                    <p class="card-text small">Datos de contacto y contraseña.</p>
+                </div>
+            </div>
+        </a>
     </div>
 </div>
 {% endblock %}

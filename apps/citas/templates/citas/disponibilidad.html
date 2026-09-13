@@ -4,7 +4,7 @@
 {% block title %}Disponibilidad de citas — Taller de Motos{% endblock %}
 
 {% block content %}
-<p class="text-muted small mb-1">CITAS</p>
+<p class="eyebrow mb-1">CITAS</p>
 <h2 class="mb-4">Consultar disponibilidad</h2>
 
 {# form GET (no POST): los params quedan en la URL y se pueden compartir o recargar #}
@@ -68,9 +68,9 @@
             <td class="align-middle">{{ slot.ocupados }} / {{ slot.capacidad }}</td>
             <td class="align-middle">
                 {% if slot.libre %}
-                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Libre</span>
+                <span class="badge rounded-pill status-badge status-on px-3 py-2">Libre</span>
                 {% else %}
-                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Lleno</span>
+                <span class="badge rounded-pill status-badge status-off px-3 py-2">Lleno</span>
                 {% endif %}
             </td>
             <td class="align-middle text-end">

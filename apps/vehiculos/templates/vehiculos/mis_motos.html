@@ -33,9 +33,9 @@
                 <td>{{ moto.kilometraje }} km</td>
                 <td>
                     {% if moto.activo %}
-                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activa</span>
+                        <span class="badge rounded-pill status-badge status-on px-3 py-2">Activa</span>
                     {% else %}
-                        <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactiva</span>
+                        <span class="badge rounded-pill status-badge status-off px-3 py-2">Inactiva</span>
                     {% endif %}
                 </td>
                 <td class="text-end">
