@@ -83,11 +83,14 @@
     <div class="row mb-3">
         <label for="contrasena" class="col-sm-3 col-form-label">Contraseña inicial</label>
         <div class="col-sm-9">
-            <input type="password" id="contrasena" name="contrasena"
-                   class="form-control {% if errores.contrasena %}is-invalid{% endif %}"
-                   autocomplete="new-password">
+            <div class="input-group">
+                <input type="password" id="contrasena" name="contrasena"
+                       class="form-control {% if errores.contrasena %}is-invalid{% endif %}"
+                       autocomplete="new-password">
+                {% include "core/_pw_toggle_boton.html" with input_id="contrasena" %}
+            </div>
             {% if errores.contrasena %}
-                <div class="invalid-feedback">{{ errores.contrasena }}</div>
+                <div class="invalid-feedback d-block">{{ errores.contrasena }}</div>
             {% endif %}
             <small class="text-muted">Mínimo 8 caracteres.</small>
         </div>

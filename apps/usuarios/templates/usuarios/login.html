@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -140,13 +141,16 @@
             
             <div class="mb-4">
                 <label for="password" class="form-label">Contraseña</label>
-                <input 
-                    type="password" 
-                    class="form-control" 
-                    id="password" 
-                    name="password" 
-                    placeholder="Contraseña"
-                    required>
+                <div class="input-group">
+                    <input
+                        type="password"
+                        class="form-control"
+                        id="password"
+                        name="password"
+                        placeholder="Contraseña"
+                        required>
+                    {% include "core/_pw_toggle_boton.html" with input_id="password" %}
+                </div>
             </div>
             
             <button type="submit" class="btn-login">
@@ -164,5 +168,6 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/password-toggle.js' %}"></script>
 </body>
 </html>

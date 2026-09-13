@@ -63,18 +63,26 @@
 
     <!-- Campo contraseña actual -->
     <div class="mb-3">
-        <label class="form-label text-muted small">Contraseña actual</label>
-        <input type="password" class="form-control {% if errores.password_actual %}is-invalid{% endif %}"
-               name="password_actual" placeholder="••••••••">
-        {% if errores.password_actual %}<div class="invalid-feedback">{{ errores.password_actual }}</div>{% endif %}
+        <label for="password_actual" class="form-label text-muted small">Contraseña actual</label>
+        <div class="input-group">
+            <input type="password" id="password_actual"
+                   class="form-control {% if errores.password_actual %}is-invalid{% endif %}"
+                   name="password_actual" placeholder="••••••••">
+            {% include "core/_pw_toggle_boton.html" with input_id="password_actual" %}
+        </div>
+        {% if errores.password_actual %}<div class="invalid-feedback d-block">{{ errores.password_actual }}</div>{% endif %}
     </div>
 
     <!-- Campo nueva contraseña -->
     <div class="mb-3">
-        <label class="form-label text-muted small">Nueva contraseña</label>
-        <input type="password" class="form-control {% if errores.password_nueva %}is-invalid{% endif %}"
-               name="password_nueva" placeholder="••••••••">
-        {% if errores.password_nueva %}<div class="invalid-feedback">{{ errores.password_nueva }}</div>{% endif %}
+        <label for="password_nueva" class="form-label text-muted small">Nueva contraseña</label>
+        <div class="input-group">
+            <input type="password" id="password_nueva"
+                   class="form-control {% if errores.password_nueva %}is-invalid{% endif %}"
+                   name="password_nueva" placeholder="••••••••">
+            {% include "core/_pw_toggle_boton.html" with input_id="password_nueva" %}
+        </div>
+        {% if errores.password_nueva %}<div class="invalid-feedback d-block">{{ errores.password_nueva }}</div>{% endif %}
     </div>
 
     <!-- Botones de acción -->
