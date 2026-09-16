@@ -1,88 +1,118 @@
 {% extends 'core/base.html' %}
 
-{% block title %}Panel del administrador · Taller{% endblock %}
+{% block title %}Inicio · Administrador · Taller{% endblock %}
+{% block topbar_title %}inicio / administrador{% endblock %}
 
 {% block content %}
-<p class="eyebrow mb-1">centro de control</p>
-<h1 class="h3 mb-4">Panel del administrador</h1>
+<div class="welcome">
+    <div>
+        <p class="eyebrow mb-1">centro de control</p>
+        <h1>Hola, {{ user.nombre }}</h1>
+    </div>
+    <span class="date">{{ hoy|date:"l d \d\e F Y" }}</span>
+</div>
 
-<div class="row g-3">
-    <div class="col-md-6 col-lg-4">
-        <a href="{% url 'citas:calendario' %}" class="card dashboard-card text-decoration-none h-100">
-            <div class="card-body">
-                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>
-                <div>
-                    <h5 class="card-title">Citas</h5>
-                    <p class="card-text small">Calendario y gestión de todas las citas.</p>
-                </div>
+<div class="stat-grid">
+    <a href="{% url 'citas:calendario' %}?modo=dia" class="stat-card">
+        <span class="stat-label">{% include 'core/_icon.html' with name='citas' %}citas de hoy</span>
+        <div class="stat-value">{{ citas_hoy }}</div>
+        <p class="stat-hint">Programadas para atender hoy</p>
+    </a>
+    <a href="{% url 'citas:calendario' %}?estado=pendiente" class="stat-card stat-amber">
+        <span class="stat-label">{% include 'core/_icon.html' with name='disponibilidad' %}pendientes</span>
+        <div class="stat-value">{{ citas_pendientes }}</div>
+        <p class="stat-hint">Por confirmar o asignar mecánico</p>
+    </a>
+    <a href="{% url 'usuarios:clientes_lista' %}" class="stat-card stat-green">
+        <span class="stat-label">{% include 'core/_icon.html' with name='clientes' %}clientes activos</span>
+        <div class="stat-value">{{ clientes_activos }}</div>
+        <p class="stat-hint">Registrados en el sistema</p>
+    </a>
+    <a href="{% url 'productos:inventario' %}" class="stat-card {% if productos_stock_bajo %}stat-red{% else %}stat-green{% endif %}">
+        <span class="stat-label">{% include 'core/_icon.html' with name='productos' %}stock bajo</span>
+        <div class="stat-value">{{ productos_stock_bajo }}</div>
+        <p class="stat-hint">{% if productos_stock_bajo %}Productos bajo el mínimo{% else %}Inventario en orden{% endif %}</p>
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="section-title">
+            <h2 class="h6">Próximas citas</h2>
+            <a href="{% url 'citas:calendario' %}" class="btn btn-sm btn-outline-dark">Ver calendario</a>
+        </div>
+        <div class="list-panel">
+            {% if proximas_citas %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-muted fw-normal small">FECHA</th>
+                            <th class="text-muted fw-normal small">CLIENTE</th>
+                            <th class="text-muted fw-normal small">MOTO</th>
+                            <th class="text-muted fw-normal small">MECÁNICO</th>
+                            <th class="text-muted fw-normal small">ESTADO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cita in proximas_citas %}
+                        <tr>
+                            <td class="mono">{{ cita.fecha|date:"d M" }} · {{ cita.hora|time:"H:i" }}</td>
+                            <td>
+                                <a href="{% url 'citas:cita_admin_detalle' cita.id %}" class="text-decoration-none">{{ cita.cliente.nombre_completo }}</a>
+                            </td>
+                            <td class="mono">{{ cita.motocicleta.placa }}</td>
+                            <td>{% if cita.mecanico %}{{ cita.mecanico.nombre }}{% else %}<span class="text-muted">Sin asignar</span>{% endif %}</td>
+                            <td><span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        </a>
+            {% else %}
+            <div class="empty">No hay citas próximas.</div>
+            {% endif %}
+        </div>
     </div>
-    <div class="col-md-6 col-lg-4">
-        <a href="{% url 'citas:disponibilidad' %}" class="card dashboard-card text-decoration-none h-100">
-            <div class="card-body">
-                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-                <div>
-                    <h5 class="card-title">Disponibilidad</h5>
-                    <p class="card-text small">Consultar slots libres por fecha y servicio.</p>
-                </div>
+
+    <div class="col-lg-5">
+        <div class="section-title">
+            <h2 class="h6">Accesos rápidos</h2>
+        </div>
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <a href="{% url 'citas:disponibilidad' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='disponibilidad' %}</span>
+                        <div><h5 class="card-title">Disponibilidad</h5><p class="card-text small">Slots libres por fecha.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-lg-4">
-        <a href="{% url 'usuarios:clientes_lista' %}" class="card dashboard-card text-decoration-none h-100">
-            <div class="card-body">
-                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg></span>
-                <div>
-                    <h5 class="card-title">Clientes</h5>
-                    <p class="card-text small">Listado y gestión de clientes registrados.</p>
-                </div>
+            <div class="col-sm-6">
+                <a href="{% url 'servicios:catalogo_servicios' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='servicios' %}</span>
+                        <div><h5 class="card-title">Servicios</h5><p class="card-text small">Catálogo del taller.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-lg-4">
-        <a href="{% url 'servicios:catalogo_servicios' %}" class="card dashboard-card text-decoration-none h-100">
-            <div class="card-body">
-                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.3 5.3L4 17a2 2 0 1 0 3 3l5.4-5.4a4 4 0 0 0 5.3-5.3l-2.5 2.5-2-2z"/></svg></span>
-                <div>
-                    <h5 class="card-title">Servicios</h5>
-                    <p class="card-text small">Catálogo de servicios del taller.</p>
-                </div>
+            <div class="col-sm-6">
+                <a href="{% url 'usuarios:usuarios_lista' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='usuarios' %}</span>
+                        <div><h5 class="card-title">Usuarios</h5><p class="card-text small">Mecánicos y admins.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-lg-4">
-        <a href="{% url 'productos:inventario' %}" class="card dashboard-card text-decoration-none h-100">
-            <div class="card-body">
-                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 7.5v9L12 21l9-4.5v-9z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg></span>
-                <div>
-                    <h5 class="card-title">Productos</h5>
-                    <p class="card-text small">Inventario de repuestos e insumos.</p>
-                </div>
+            <div class="col-sm-6">
+                <a href="{% url 'configuracion:horario' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='horario' %}</span>
+                        <div><h5 class="card-title">Horario</h5><p class="card-text small">Días y horas de atención.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-lg-4">
-        <a href="{% url 'usuarios:usuarios_lista' %}" class="card dashboard-card text-decoration-none h-100">
-            <div class="card-body">
-                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M17 3.5l1.5 1.5M19.5 8h-2"/></svg></span>
-                <div>
-                    <h5 class="card-title">Usuarios</h5>
-                    <p class="card-text small">Mecánicos y administradores del sistema.</p>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-6 col-lg-4">
-        <a href="{% url 'configuracion:horario' %}" class="card dashboard-card text-decoration-none h-100">
-            <div class="card-body">
-                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>
-                <div>
-                    <h5 class="card-title">Horario</h5>
-                    <p class="card-text small">Configuración del horario de atención.</p>
-                </div>
-            </div>
-        </a>
+        </div>
     </div>
 </div>
 {% endblock %}

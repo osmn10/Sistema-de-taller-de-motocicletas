@@ -18,29 +18,74 @@
 
     {% block extra_css %}{% endblock %}
 </head>
-<body class="d-flex flex-column min-vh-100">
+<body class="{% if user.is_authenticated %}has-sidebar{% else %}d-flex flex-column min-vh-100{% endif %}">
 
-    {% block navbar %}
-    {% with ns=request.resolver_match.namespace un=request.resolver_match.url_name %}
-    <nav class="navbar navbar-expand-lg navbar-cyber">
-        <div class="container">
+{% if user.is_authenticated %}<div class="app-shell">{% endif %}
 
-            {% if user.is_authenticated and user.is_admin %}
+{% block navbar %}
+{% with ns=request.resolver_match.namespace un=request.resolver_match.url_name %}
+{% if user.is_authenticated %}
+    <aside class="sidebar offcanvas-lg offcanvas-start" id="sidebar" tabindex="-1" aria-label="Menú principal">
+        <div class="sidebar-brand">
+            {% if user.is_admin %}
                 <a class="navbar-brand" href="{% url 'core:admin_panel' %}">
                     {% include 'core/_brand_mark.html' %}
                     <span>Taller <small>/ admin</small></span>
                 </a>
-            {% elif user.is_authenticated and user.is_mecanico %}
+            {% elif user.is_mecanico %}
                 <a class="navbar-brand" href="{% url 'core:panel_mecanico' %}">
                     {% include 'core/_brand_mark.html' %}
                     <span>Taller <small>/ mecánico</small></span>
                 </a>
             {% else %}
-                <a class="navbar-brand" href="{% url 'core:home' %}">
+                <a class="navbar-brand" href="{% url 'citas:mis_citas' %}">
                     {% include 'core/_brand_mark.html' %}
-                    <span>Taller <small>/ motos</small></span>
+                    <span>Taller <small>/ cliente</small></span>
                 </a>
             {% endif %}
+            <button type="button" class="btn-close d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Cerrar menú"></button>
+        </div>
+
+        <p class="sidebar-label">navegación</p>
+        <nav class="sidebar-nav">
+            {% if user.is_admin %}
+                <a class="side-link {% if un == 'admin_panel' %}active{% endif %}" href="{% url 'core:admin_panel' %}">{% include 'core/_icon.html' with name='inicio' %}<span>Inicio</span></a>
+                <a class="side-link {% if ns == 'citas' and un != 'disponibilidad' %}active{% endif %}" href="{% url 'citas:calendario' %}">{% include 'core/_icon.html' with name='citas' %}<span>Citas</span></a>
+                <a class="side-link {% if un == 'disponibilidad' %}active{% endif %}" href="{% url 'citas:disponibilidad' %}">{% include 'core/_icon.html' with name='disponibilidad' %}<span>Disponibilidad</span></a>
+                <a class="side-link {% if un == 'clientes_lista' or un == 'cliente_detalle' or un == 'cliente_editar' %}active{% endif %}" href="{% url 'usuarios:clientes_lista' %}">{% include 'core/_icon.html' with name='clientes' %}<span>Clientes</span></a>
+                <a class="side-link {% if ns == 'servicios' %}active{% endif %}" href="{% url 'servicios:catalogo_servicios' %}">{% include 'core/_icon.html' with name='servicios' %}<span>Servicios</span></a>
+                <a class="side-link {% if ns == 'productos' %}active{% endif %}" href="{% url 'productos:inventario' %}">{% include 'core/_icon.html' with name='productos' %}<span>Productos</span></a>
+                <a class="side-link {% if un == 'usuarios_lista' or un == 'usuario_crear' or un == 'usuario_editar' %}active{% endif %}" href="{% url 'usuarios:usuarios_lista' %}">{% include 'core/_icon.html' with name='usuarios' %}<span>Usuarios</span></a>
+                <a class="side-link {% if ns == 'configuracion' %}active{% endif %}" href="{% url 'configuracion:horario' %}">{% include 'core/_icon.html' with name='horario' %}<span>Horario</span></a>
+            {% elif user.is_mecanico %}
+                <a class="side-link {% if un == 'panel_mecanico' %}active{% endif %}" href="{% url 'core:panel_mecanico' %}">{% include 'core/_icon.html' with name='inicio' %}<span>Inicio</span></a>
+                <a class="side-link {% if ns == 'citas' %}active{% endif %}" href="{% url 'citas:mis_citas_mecanico' %}">{% include 'core/_icon.html' with name='citas' %}<span>Mis citas</span></a>
+            {% else %}
+                <a class="side-link {% if ns == 'citas' and un != 'disponibilidad' and un != 'agendar_cita' %}active{% endif %}" href="{% url 'citas:mis_citas' %}">{% include 'core/_icon.html' with name='citas' %}<span>Mis citas</span></a>
+                <a class="side-link {% if un == 'disponibilidad' or un == 'agendar_cita' %}active{% endif %}" href="{% url 'citas:disponibilidad' %}">{% include 'core/_icon.html' with name='disponibilidad' %}<span>Agendar cita</span></a>
+                <a class="side-link {% if ns == 'vehiculos' %}active{% endif %}" href="{% url 'vehiculos:mis_motos' %}">{% include 'core/_icon.html' with name='motos' %}<span>Mis motos</span></a>
+            {% endif %}
+
+            <p class="sidebar-label mt-3">cuenta</p>
+            <a class="side-link {% if un == 'mi_perfil' %}active{% endif %}" href="{% url 'usuarios:mi_perfil' %}">{% include 'core/_icon.html' with name='perfil' %}<span>Mi perfil</span></a>
+            <a class="side-link side-link-danger" href="{% url 'usuarios:logout' %}">{% include 'core/_icon.html' with name='salir' %}<span>Cerrar sesión</span></a>
+        </nav>
+
+        <div class="sidebar-user">
+            <span class="avatar">{{ user.nombre|first }}{{ user.apellido|first }}</span>
+            <span class="d-flex flex-column lh-1 overflow-hidden">
+                <span class="text-truncate">{{ user.nombre }} {{ user.apellido }}</span>
+                <span class="role">{{ user.rol }}</span>
+            </span>
+        </div>
+    </aside>
+{% else %}
+    <nav class="navbar navbar-expand-lg navbar-cyber">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'core:home' %}">
+                {% include 'core/_brand_mark.html' %}
+                <span>Taller <small>/ motos</small></span>
+            </a>
 
             <button class="navbar-toggler" type="button"
                     data-bs-toggle="collapse" data-bs-target="#mainNav"
@@ -49,101 +94,54 @@
             </button>
 
             <div class="collapse navbar-collapse" id="mainNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-
-                    {% if user.is_authenticated and user.is_cliente %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if ns == 'citas' %}active{% endif %}" href="{% url 'citas:mis_citas' %}">Mis citas</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if ns == 'vehiculos' %}active{% endif %}" href="{% url 'vehiculos:mis_motos' %}">Mis motos</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if un == 'mi_perfil' %}active{% endif %}" href="{% url 'usuarios:mi_perfil' %}">Perfil</a>
-                        </li>
-
-                    {% elif user.is_authenticated and user.is_admin %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if ns == 'citas' %}active{% endif %}" href="{% url 'citas:calendario' %}">Citas</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if un == 'clientes_lista' or un == 'cliente_detalle' or un == 'cliente_editar' %}active{% endif %}" href="{% url 'usuarios:clientes_lista' %}">Clientes</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if ns == 'servicios' %}active{% endif %}" href="{% url 'servicios:catalogo_servicios' %}">Servicios</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if ns == 'productos' %}active{% endif %}" href="{% url 'productos:inventario' %}">Productos</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if un == 'usuarios_lista' or un == 'usuario_crear' or un == 'usuario_editar' %}active{% endif %}" href="{% url 'usuarios:usuarios_lista' %}">Usuarios</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if ns == 'configuracion' %}active{% endif %}" href="{% url 'configuracion:horario' %}">Horario</a>
-                        </li>
-
-                    {% elif user.is_authenticated and user.is_mecanico %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if ns == 'citas' %}active{% endif %}" href="{% url 'citas:mis_citas_mecanico' %}">Mis citas</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if un == 'mi_perfil' %}active{% endif %}" href="{% url 'usuarios:mi_perfil' %}">Perfil</a>
-                        </li>
-                    {% endif %}
-                </ul>
-
                 <ul class="navbar-nav ms-auto align-items-lg-center">
-                    {% if user.is_authenticated %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link user-chip" href="#" role="button"
-                               data-bs-toggle="dropdown" aria-expanded="false">
-                                <span class="avatar">{{ user.nombre|first }}{{ user.apellido|first }}</span>
-                                <span class="d-flex flex-column lh-1">
-                                    <span>{{ user.nombre }} {{ user.apellido }}</span>
-                                    <span class="role">{{ user.rol }}</span>
-                                </span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li>
-                                    <a class="dropdown-item" href="{% url 'usuarios:mi_perfil' %}">Mi perfil</a>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <a class="dropdown-item" href="{% url 'usuarios:logout' %}">Cerrar sesión</a>
-                                </li>
-                            </ul>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if un == 'login' %}active{% endif %}" href="{% url 'usuarios:login' %}">Iniciar sesión</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if un == 'registro_cliente' %}active{% endif %}" href="{% url 'usuarios:registro_cliente' %}">Registrarse</a>
-                        </li>
-                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if un == 'login' %}active{% endif %}" href="{% url 'usuarios:login' %}">Iniciar sesión</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if un == 'registro_cliente' %}active{% endif %}" href="{% url 'usuarios:registro_cliente' %}">Registrarse</a>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
-    {% endwith %}
-    {% endblock %}
+{% endif %}
+{% endwith %}
+{% endblock %}
 
-    <main class="container flex-grow-1 fade-in">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
+{% if user.is_authenticated %}
+    <div class="app-main">
+        <header class="topbar">
+            <button class="btn btn-outline-dark btn-sm d-lg-none topbar-toggle" type="button"
+                    data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Abrir menú">
+                {% include 'core/_icon.html' with name='menu' %}
+            </button>
+            <span class="topbar-title">{% block topbar_title %}{% endblock %}</span>
+            <span class="topbar-status"><span class="dot"></span>en línea</span>
+        </header>
+        <main class="container-fluid app-content fade-in">
+{% else %}
+        <main class="container flex-grow-1 fade-in">
+{% endif %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
 
-        {% block content %}{% endblock %}
-    </main>
+            {% block content %}{% endblock %}
+        </main>
 
-    <footer class="page-footer text-center py-3 mt-auto">
-        <span class="dot"></span>Sistema en línea &middot; Taller de Motos &middot; Proyecto DSI &middot; UES &middot; Grupo 1
-    </footer>
+        <footer class="page-footer text-center py-3 mt-auto">
+            {% if not user.is_authenticated %}<span class="dot"></span>Sistema en línea &middot; {% endif %}Taller de Motos &middot; Proyecto DSI &middot; UES &middot; Grupo 1
+        </footer>
+{% if user.is_authenticated %}
+    </div>
+</div>
+{% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'js/masks.js' %}"></script>
