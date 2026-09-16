@@ -15,7 +15,13 @@ ESTADOS_ACTIVOS = [Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA, Cita.ESTADO_EN
 
 
 def home(request):
-    """Página de inicio pública."""
+    """Página de inicio pública. Si ya hay sesión, redirige al panel del rol."""
+    if request.user.is_authenticated:
+        if request.user.is_admin:
+            return redirect('core:admin_panel')
+        if request.user.is_mecanico:
+            return redirect('core:panel_mecanico')
+        return redirect('citas:mis_citas')
     return render(request, 'core/home.html')
 
 
