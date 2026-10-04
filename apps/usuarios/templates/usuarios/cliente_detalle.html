@@ -12,9 +12,9 @@
     <div>
         <h1 class="h3 mb-1">{{ cliente.nombre_completo }}</h1>
         {% if cliente.activo %}
-            <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activo</span>
+            <span class="badge rounded-pill status-badge status-on px-3 py-2">Activo</span>
         {% else %}
-            <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactivo</span>
+            <span class="badge rounded-pill status-badge status-off px-3 py-2">Inactivo</span>
         {% endif %}
     </div>
     <div class="d-flex gap-2">
@@ -94,9 +94,9 @@
                         <td>{{ moto.kilometraje }} km</td>
                         <td>
                             {% if moto.activo %}
-                                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Activa</span>
+                                <span class="badge rounded-pill status-badge status-on px-3 py-2">Activa</span>
                             {% else %}
-                                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">Inactiva</span>
+                                <span class="badge rounded-pill status-badge status-off px-3 py-2">Inactiva</span>
                             {% endif %}
                         </td>
                     </tr>

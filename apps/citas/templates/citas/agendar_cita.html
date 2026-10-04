@@ -4,7 +4,7 @@
 {% block title %}Agendar cita — Taller de Motos{% endblock %}
 
 {% block content %}
-<p class="text-muted small mb-1">CITAS</p>
+<p class="eyebrow mb-1">CITAS</p>
 <a href="{% url 'citas:disponibilidad' %}?fecha={{ fecha|date:'Y-m-d' }}&servicio={{ servicio_principal.id }}"
    class="text-decoration-none text-muted small">‹ Volver a disponibilidad</a>
 <h2 class="mb-4 mt-2">Agendar nueva cita</h2>

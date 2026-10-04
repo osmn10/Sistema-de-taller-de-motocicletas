@@ -2,15 +2,23 @@
 
 import re
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.tokens import default_token_generator
 from django.db import connection, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views import View
 
+from apps.core.emails import enviar_correo_html
+
 from .models import Cliente, Mecanico, Usuario, dui_validator, telefono_validator
+from .validators import validar_password_segura
 
 def registro_cliente(request):
     """Muestra y procesa el formulario de registro de un nuevo cliente (RF-01)."""
@@ -43,8 +51,9 @@ def registro_cliente(request):
             errores['email'] = 'Correo electrónico inválido.'
         if not datos['direccion']:
             errores['direccion'] = 'La dirección es obligatoria.'
-        if len(contrasena) < 8:
-            errores['contrasena'] = 'La contraseña debe tener al menos 8 caracteres.'
+        errores_password = validar_password_segura(contrasena)
+        if errores_password:
+            errores['contrasena'] = ' '.join(errores_password)
         elif contrasena != confirmar:
             errores['confirmar'] = 'Las contraseñas no coinciden.'
         if Cliente.objects.filter(dui=datos['dui']).exists():
@@ -115,6 +124,130 @@ class LogoutView(View):
         logout(request)
         messages.info(request, 'Has cerrado sesión correctamente.')
         return redirect('usuarios:login')
+
+
+# ---------------------------------------------------------------------------
+# V2SCRUM-34 · Recuperación de contraseña por correo
+# ---------------------------------------------------------------------------
+def _enviar_correo_recuperacion(request, usuario):
+    """Genera el enlace firmado y envía el correo de recuperación."""
+    uid = urlsafe_base64_encode(force_bytes(usuario.pk))
+    token = default_token_generator.make_token(usuario)
+    ruta = reverse(
+        'usuarios:password_reset_confirmar',
+        kwargs={'uidb64': uid, 'token': token},
+    )
+    enlace = request.build_absolute_uri(ruta)
+    enviar_correo_html(
+        asunto=f'Recuperación de contraseña - {settings.TALLER_NOMBRE}',
+        plantilla='emails/usuarios/password_reset.html',
+        contexto={'usuario': usuario, 'enlace': enlace},
+        destinatarios=[usuario.email],
+    )
+
+
+def _usuario_desde_uid(uidb64):
+    """Recupera el usuario activo referido por el uid del enlace, o None."""
+    try:
+        pk = urlsafe_base64_decode(uidb64).decode()
+        return Usuario.objects.get(pk=pk, activo=True)
+    except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
+        return None
+
+
+def password_reset_solicitar(request):
+    """Paso 1: el usuario pide el enlace ingresando su DUI o su correo.
+
+    Por seguridad la respuesta es siempre la misma, exista o no la cuenta,
+    para no revelar qué correos están registrados en el sistema.
+    """
+    if request.method == 'POST':
+        identificador = request.POST.get('identificador', '').strip()
+
+        # Validación de formato. Un dato mal escrito es un error de tipeo:
+        # marcarlo no revela si existe una cuenta, así que sí se informa.
+        error_formato = None
+        if not identificador:
+            error_formato = 'Ingresá tu DUI o tu correo electrónico.'
+        elif '@' in identificador:
+            if not re.match(r'^[^@]+@[^@]+\.[^@]+$', identificador):
+                error_formato = 'El correo electrónico no tiene un formato válido.'
+        else:
+            try:
+                dui_validator(identificador)
+            except Exception:
+                error_formato = 'El DUI no tiene un formato válido. Debe ser 00000000-0.'
+
+        if error_formato:
+            return render(request, 'usuarios/password_reset_solicitar.html', {
+                'error': error_formato,
+                'identificador': identificador,
+            })
+
+        usuario = (
+            Usuario.objects
+            .filter(Q(dui=identificador) | Q(email__iexact=identificador))
+            .filter(activo=True)
+            .first()
+        )
+        if usuario and usuario.email:
+            _enviar_correo_recuperacion(request, usuario)
+        messages.success(
+            request,
+            'Si la cuenta existe, enviamos un correo con instrucciones para '
+            'restablecer la contraseña.',
+        )
+        return redirect('usuarios:login')
+
+    return render(request, 'usuarios/password_reset_solicitar.html')
+
+
+def password_reset_confirmar(request, uidb64, token):
+    """Paso 2: valida el enlace del correo y fija la nueva contraseña."""
+    usuario = _usuario_desde_uid(uidb64)
+    token_valido = (
+        usuario is not None
+        and default_token_generator.check_token(usuario, token)
+    )
+
+    if not token_valido:
+        messages.error(
+            request,
+            'El enlace de recuperación no es válido o ya expiró. '
+            'Solicitá uno nuevo.',
+        )
+        return redirect('usuarios:password_reset_solicitar')
+
+    if request.method == 'POST':
+        contrasena = request.POST.get('contrasena', '')
+        confirmar = request.POST.get('confirmar', '')
+
+        errores = validar_password_segura(contrasena)
+        if contrasena != confirmar:
+            errores.append('Las contraseñas no coinciden.')
+
+        if errores:
+            return render(request, 'usuarios/password_reset_confirmar.html', {
+                'errores': errores,
+            })
+
+        usuario.set_password(contrasena)
+        usuario.save(update_fields=['password'])
+
+        enviar_correo_html(
+            asunto=f'Tu contraseña fue restablecida - {settings.TALLER_NOMBRE}',
+            plantilla='emails/usuarios/password_reset_hecho.html',
+            contexto={'usuario': usuario},
+            destinatarios=[usuario.email],
+        )
+
+        messages.success(
+            request,
+            'Contraseña actualizada. Ya podés iniciar sesión con la nueva.',
+        )
+        return redirect('usuarios:login')
+
+    return render(request, 'usuarios/password_reset_confirmar.html', {'errores': []})
 
 
 @login_required(login_url='usuarios:login')
@@ -511,8 +644,9 @@ def usuario_reset_password(request, dui):
 
     nueva_contrasena = request.POST.get('nueva_contrasena', '').strip()
 
-    if len(nueva_contrasena) < 8:
-        messages.error(request, 'La contraseña debe tener al menos 8 caracteres.')
+    errores_password = validar_password_segura(nueva_contrasena)
+    if errores_password:
+        messages.error(request, 'Contraseña insegura: ' + ' '.join(errores_password))
         return redirect('usuarios:usuario_editar', dui=dui)
 
     usuario.set_password(nueva_contrasena)

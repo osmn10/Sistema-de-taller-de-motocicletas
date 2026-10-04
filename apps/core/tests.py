@@ -38,7 +38,7 @@ class ProbarCorreoCommandTests(SimpleTestCase):
     )
     @patch('apps.core.management.commands.probar_correo.enviar_correo_html')
     def test_sin_clave_no_intenta_smtp(self, enviar):
-        with self.assertRaisesMessage(CommandError, 'Falta RESEND_API_KEY'):
+        with self.assertRaisesMessage(CommandError, 'Falta EMAIL_HOST_PASSWORD'):
             call_command('probar_correo', 'cliente@example.com')
         enviar.assert_not_called()
 
