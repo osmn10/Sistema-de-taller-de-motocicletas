@@ -4,6 +4,9 @@ from io import StringIO
 from unittest.mock import patch
 from smtplib import SMTPAuthenticationError
 
+from anymail.exceptions import AnymailRequestsAPIError
+from requests import Response
+
 from django.core import mail
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -49,6 +52,43 @@ class ProbarCorreoCommandTests(SimpleTestCase):
         with self.assertRaisesMessage(CommandError, 'Falta EMAIL_HOST_PASSWORD'):
             call_command('probar_correo', 'cliente@example.com')
         enviar.assert_not_called()
+
+    @override_settings(
+        EMAIL_BACKEND='anymail.backends.brevo.EmailBackend',
+        ANYMAIL={'BREVO_API_KEY': ''},
+    )
+    @patch('apps.core.management.commands.probar_correo.enviar_correo_html')
+    def test_sin_clave_brevo_no_intenta_enviar(self, enviar):
+        with self.assertRaisesMessage(CommandError, 'Falta BREVO_API_KEY'):
+            call_command('probar_correo', 'cliente@example.com')
+        enviar.assert_not_called()
+
+    def _error_brevo(self, codigo):
+        respuesta = Response()
+        respuesta.status_code = codigo
+        return AnymailRequestsAPIError('respuesta-secreta-simulada', response=respuesta)
+
+    @override_settings(
+        EMAIL_BACKEND='anymail.backends.brevo.EmailBackend',
+        ANYMAIL={'BREVO_API_KEY': 'clave-de-prueba'},
+    )
+    @patch('apps.core.management.commands.probar_correo.enviar_correo_html')
+    def test_brevo_401_indica_revisar_la_clave(self, enviar):
+        enviar.side_effect = self._error_brevo(401)
+        with self.assertRaisesMessage(CommandError, 'Brevo rechazó la clave (401)') as resultado:
+            call_command('probar_correo', 'cliente@example.com')
+        self.assertNotIn('respuesta-secreta-simulada', str(resultado.exception))
+
+    @override_settings(
+        EMAIL_BACKEND='anymail.backends.brevo.EmailBackend',
+        ANYMAIL={'BREVO_API_KEY': 'clave-de-prueba'},
+    )
+    @patch('apps.core.management.commands.probar_correo.enviar_correo_html')
+    def test_brevo_400_pide_revisar_remitente_y_datos(self, enviar):
+        enviar.side_effect = self._error_brevo(400)
+        with self.assertRaisesMessage(CommandError, 'remitente esté verificado') as resultado:
+            call_command('probar_correo', 'cliente@example.com')
+        self.assertNotIn('respuesta-secreta-simulada', str(resultado.exception))
 
     @patch('apps.core.management.commands.probar_correo.enviar_correo_html')
     def test_error_del_comando_no_expone_respuesta_del_proveedor(self, enviar):
