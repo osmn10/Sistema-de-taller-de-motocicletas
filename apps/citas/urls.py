@@ -18,4 +18,5 @@ urlpatterns = [
     path('calendario/<int:cita_id>/', views.cita_admin_detalle, name='cita_admin_detalle'),
     path('mis-citas-mecanico/', views.mis_citas_mecanico, name='mis_citas_mecanico'),
     path('estados/', views.estados_cita, name='estados_cita'),
+    path('reporte/', views.reporte_servicios, name='reporte_servicios'),
 ]
