@@ -1,7 +1,12 @@
 """Vistas de la app productos — CRUD de inventario de repuestos."""
 
+import re
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Producto, Proveedor
@@ -64,7 +69,7 @@ def crear_producto(request):
         precio = request.POST.get('precio', '').strip()
         stock_actual = request.POST.get('stock_actual', '').strip()
         stock_minimo = request.POST.get('stock_minimo', '').strip()
-        proveedor_nit = request.POST.get('proveedor', '').strip()
+        proveedor_id = request.POST.get('proveedor', '').strip()
 
         # Diccionario para acumular errores
         errores = {}
@@ -107,10 +112,10 @@ def crear_producto(request):
 
         # Buscar el proveedor si se seleccionó uno
         proveedor = None
-        if proveedor_nit:
+        if proveedor_id:
             try:
-                proveedor = Proveedor.objects.get(nit=proveedor_nit)
-            except Proveedor.DoesNotExist:
+                proveedor = Proveedor.objects.get(id=proveedor_id, activo=True)
+            except (Proveedor.DoesNotExist, ValueError):
                 errores['proveedor'] = 'Proveedor no encontrado.'
 
         # Si hay errores, volver al inventario con los errores
@@ -169,7 +174,7 @@ def editar_producto(request, producto_id):
         precio = request.POST.get('precio', '').strip()
         stock_actual = request.POST.get('stock_actual', '').strip()
         stock_minimo = request.POST.get('stock_minimo', '').strip()
-        proveedor_nit = request.POST.get('proveedor', '').strip()
+        proveedor_id = request.POST.get('proveedor', '').strip()
 
         # Diccionario para acumular errores
         errores = {}
@@ -210,17 +215,19 @@ def editar_producto(request, producto_id):
             except ValueError:
                 errores['stock_minimo'] = 'El stock mínimo debe ser un número entero.'
 
-        # Buscar el proveedor si se seleccionó uno
+        # Buscar el proveedor si se seleccionó uno (se acepta el actual aunque esté desactivado)
         proveedor = None
-        if proveedor_nit:
+        if proveedor_id:
             try:
-                proveedor = Proveedor.objects.get(nit=proveedor_nit)
-            except Proveedor.DoesNotExist:
+                proveedor = Proveedor.objects.filter(
+                    Q(activo=True) | Q(id=producto.proveedor_id)
+                ).get(id=proveedor_id)
+            except (Proveedor.DoesNotExist, ValueError):
                 errores['proveedor'] = 'Proveedor no encontrado.'
 
         # Si hay errores, volver a mostrar el formulario
         if errores:
-            proveedores = Proveedor.objects.filter(activo=True)
+            proveedores = Proveedor.objects.filter(Q(activo=True) | Q(id=producto.proveedor_id))
             return render(request, 'productos/editar_producto.html', {
                 'producto': producto,
                 'proveedores': proveedores,
@@ -241,7 +248,7 @@ def editar_producto(request, producto_id):
         return redirect('productos:inventario')
 
     # GET: mostrar formulario con datos actuales del producto
-    proveedores = Proveedor.objects.filter(activo=True)
+    proveedores = Proveedor.objects.filter(Q(activo=True) | Q(id=producto.proveedor_id))
     return render(request, 'productos/editar_producto.html', {
         'producto': producto,
         'proveedores': proveedores,
@@ -267,3 +274,97 @@ def desactivar_producto(request, producto_id):
         messages.success(request, f'Producto "{producto.nombre}" desactivado.')
 
     return redirect('productos:inventario')
+
+@login_required(login_url='usuarios:login')
+def proveedores(request):
+    """Lista, crea, edita y activa/desactiva proveedores de productos."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    lista = Proveedor.objects.annotate(total_productos=Count('productos'))
+
+    proveedor_editar = None
+    editar_id = request.GET.get('editar')
+    if editar_id:
+        proveedor_editar = get_object_or_404(Proveedor, id=editar_id)
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+
+        if accion == 'guardar':
+            errores = {}
+            proveedor_id = request.POST.get('proveedor_id')
+            if proveedor_id:
+                proveedor_editar = get_object_or_404(Proveedor, id=proveedor_id)
+
+            datos = {
+                'nombre':   request.POST.get('nombre', '').strip(),
+                'telefono': request.POST.get('telefono', '').strip(),
+                'email':    request.POST.get('email', '').strip(),
+            }
+
+            if not datos['nombre']:
+                errores['nombre'] = 'El nombre es obligatorio.'
+            else:
+                repetido = Proveedor.objects.filter(nombre__iexact=datos['nombre'])
+                if proveedor_editar:
+                    repetido = repetido.exclude(id=proveedor_editar.id)
+                if repetido.exists():
+                    errores['nombre'] = 'Ya existe un proveedor con ese nombre.'
+
+            if datos['telefono'] and not re.match(r'^\d{4}-\d{4}$', datos['telefono']):
+                errores['telefono'] = 'El teléfono debe tener formato 0000-0000.'
+
+            if datos['email']:
+                try:
+                    validate_email(datos['email'])
+                except ValidationError:
+                    errores['email'] = 'Ingresá un correo válido.'
+
+            if errores:
+                return render(request, 'productos/proveedores.html', {
+                    'proveedores': lista,
+                    'errores': errores,
+                    'datos': datos,
+                    'proveedor_editar': proveedor_editar,
+                    'mostrar_form': True,
+                })
+
+            if proveedor_editar:
+                proveedor_editar.nombre = datos['nombre']
+                proveedor_editar.telefono = datos['telefono']
+                proveedor_editar.email = datos['email']
+                proveedor_editar.save()
+                messages.success(request, f'Proveedor "{proveedor_editar.nombre}" actualizado.')
+            else:
+                Proveedor.objects.create(
+                    nombre=datos['nombre'],
+                    telefono=datos['telefono'],
+                    email=datos['email'],
+                )
+                messages.success(request, f'Proveedor "{datos["nombre"]}" creado.')
+
+            return redirect('productos:proveedores')
+
+        elif accion == 'desactivar':
+            proveedor = get_object_or_404(Proveedor, id=request.POST.get('proveedor_id'))
+            proveedor.activo = False
+            proveedor.save(update_fields=['activo'])
+            messages.success(request, f'Proveedor "{proveedor.nombre}" desactivado.')
+            return redirect('productos:proveedores')
+
+        elif accion == 'activar':
+            proveedor = get_object_or_404(Proveedor, id=request.POST.get('proveedor_id'))
+            proveedor.activo = True
+            proveedor.save(update_fields=['activo'])
+            messages.success(request, f'Proveedor "{proveedor.nombre}" activado.')
+            return redirect('productos:proveedores')
+
+    return render(request, 'productos/proveedores.html', {
+        'proveedores': lista,
+        'errores': {},
+        'datos': {},
+        'proveedor_editar': proveedor_editar,
+        'mostrar_form': bool(request.GET.get('mostrar_form') or proveedor_editar),
+    })

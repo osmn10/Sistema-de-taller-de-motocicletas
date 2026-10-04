@@ -69,7 +69,7 @@
                 <select class="form-select" name="proveedor">
                     <option value="">Sin proveedor</option>
                     {% for prov in proveedores %}
-                    <option value="{{ prov.nit }}">{{ prov.nombre }}</option>
+                    <option value="{{ prov.id }}">{{ prov.nombre }}</option>
                     {% endfor %}
                 </select>
             </div>

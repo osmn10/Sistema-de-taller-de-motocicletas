@@ -15,4 +15,5 @@ urlpatterns = [
     path('<int:producto_id>/editar/', views.editar_producto, name='editar_producto'),
     # Desactivar producto: /productos/5/desactivar/ (solo POST)
     path('<int:producto_id>/desactivar/', views.desactivar_producto, name='desactivar_producto'),
+    path('proveedores/', views.proveedores, name='proveedores'),
 ]

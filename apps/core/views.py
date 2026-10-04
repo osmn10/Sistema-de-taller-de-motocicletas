@@ -7,11 +7,11 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from apps.citas.models import Cita
+from apps.citas.models import Cita, EstadoCita
 from apps.productos.models import Producto
 from apps.usuarios.models import Cliente
 
-ESTADOS_ACTIVOS = [Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA, Cita.ESTADO_EN_PROCESO]
+TIPOS_ACTIVOS = [EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO]
 
 
 def home(request):
@@ -33,16 +33,17 @@ def admin_panel(request):
         return redirect('core:home')
 
     hoy = timezone.localdate()
-    citas_activas = Cita.objects.filter(estado__in=ESTADOS_ACTIVOS)
+    citas_activas = Cita.objects.filter(estado__tipo__in=TIPOS_ACTIVOS)
     contexto = {
         'hoy': hoy,
         'citas_hoy': citas_activas.filter(fecha=hoy).count(),
-        'citas_pendientes': Cita.objects.filter(estado=Cita.ESTADO_PENDIENTE).count(),
+        'citas_pendientes': Cita.objects.filter(estado__tipo=EstadoCita.TIPO_INICIO).count(),
+        'estado_inicial': EstadoCita.objects.filter(tipo=EstadoCita.TIPO_INICIO).first(),
         'clientes_activos': Cliente.objects.filter(activo=True).count(),
         'productos_stock_bajo': sum(1 for p in Producto.objects.filter(activo=True) if p.stock_bajo),
         'proximas_citas': (
             citas_activas.filter(fecha__gte=hoy)
-            .select_related('cliente', 'motocicleta', 'mecanico')
+            .select_related('cliente', 'motocicleta', 'mecanico', 'estado')
             .order_by('fecha', 'hora')[:6]
         ),
     }
@@ -57,16 +58,16 @@ def panel_mecanico(request):
         return redirect('core:home')
 
     hoy = timezone.localdate()
-    mis_citas = Cita.objects.filter(mecanico=request.user.mecanico, estado__in=ESTADOS_ACTIVOS)
+    mis_citas = Cita.objects.filter(mecanico=request.user.mecanico, estado__tipo__in=TIPOS_ACTIVOS)
     contexto = {
         'hoy': hoy,
         'citas_hoy': mis_citas.filter(fecha=hoy).count(),
-        'citas_en_proceso': mis_citas.filter(estado=Cita.ESTADO_EN_PROCESO).count(),
+        'citas_en_proceso': mis_citas.filter(estado__tipo=EstadoCita.TIPO_PROCESO).count(),
         'citas_semana': mis_citas.filter(fecha__gte=hoy, fecha__lte=hoy + timedelta(days=7)).count(),
-        'sin_asignar': Cita.objects.filter(mecanico__isnull=True, estado__in=ESTADOS_ACTIVOS, fecha__gte=hoy).count(),
+        'sin_asignar': Cita.objects.filter(mecanico__isnull=True, estado__tipo__in=TIPOS_ACTIVOS, fecha__gte=hoy).count(),
         'proximas_citas': (
             mis_citas.filter(fecha__gte=hoy)
-            .select_related('cliente', 'motocicleta')
+            .select_related('cliente', 'motocicleta', 'estado')
             .order_by('fecha', 'hora')[:6]
         ),
     }
