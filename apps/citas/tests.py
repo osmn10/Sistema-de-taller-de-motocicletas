@@ -411,3 +411,87 @@ class FinalizarServicioTests(TestCase):
         self.producto.refresh_from_db()
         self.assertEqual(cita.estado, Cita.ESTADO_EN_PROCESO)
         self.assertEqual(self.producto.stock_actual, 10)
+
+class ReasignarMecanicoTests(TestCase):
+    """Reasignar el mecánico de una cita validando su disponibilidad."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = Usuario.objects.create_admin(
+            dui='88888888-8', password='admin123', nombre='Beto', apellido='Admin',
+            telefono='7000-8888', email='admin3@example.com',
+        )
+        cls.cliente = Usuario.objects.create_cliente(
+            dui='77777777-7', password='cliente123', nombre='Ana', apellido='López',
+            telefono='7000-7777', email='ana@example.com', direccion='San Salvador',
+        )
+        cls.mecanico_a, cls.mecanico_b = (
+            Usuario.objects.create_mecanico(
+                dui=f'{n}' * 8 + f'-{n}', password='mecanico123', nombre=nombre, apellido='Prueba',
+                telefono=f'7000-{n}{n}{n}{n}', email=f'{nombre.lower()}@example.com',
+                especialidad=Mecanico.ESPECIALIDAD_MECANICA_GENERAL,
+            )
+            for n, nombre in ((1, 'Andres'), (2, 'Bruno'))
+        )
+        cls.motocicleta = Motocicleta.objects.create(
+            placa='M-1234', cliente=cls.cliente, marca='Honda', modelo='CB 190', anio=2022, color='Rojo',
+        )
+        cls.servicio = Servicio.objects.create(nombre='Cambio de aceite', precio_base='15.00', duracion_estimada=60)
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def crear_cita(self, hora, mecanico, estado=Cita.ESTADO_CONFIRMADA):
+        cita = Cita.objects.create(
+            cliente=self.cliente, motocicleta=self.motocicleta, mecanico=mecanico,
+            fecha=date.today() + timedelta(days=1), hora=hora, estado=estado,
+        )
+        ServicioCita.objects.create(cita=cita, servicio=self.servicio, precio_final=self.servicio.precio_base)
+        return cita
+
+    def reasignar(self, cita, mecanico):
+        respuesta = self.client.post(
+            reverse('citas:cita_admin_detalle', args=[cita.id]),
+            {'accion': 'asignar_mecanico', 'mecanico_dui': mecanico.dui},
+            follow=True,
+        )
+        cita.refresh_from_db()
+        return respuesta
+
+    def test_lista_solo_mecanicos_disponibles(self):
+        self.crear_cita(time(9, 0), self.mecanico_b)
+        cita = self.crear_cita(time(9, 30), self.mecanico_a)
+
+        respuesta = self.client.get(reverse('citas:cita_admin_detalle', args=[cita.id]))
+
+        self.assertEqual(list(respuesta.context['mecanicos']), [self.mecanico_a])
+
+    def test_reasigna_a_mecanico_disponible(self):
+        self.crear_cita(time(8, 0), self.mecanico_b)  # termina 9:00, no se cruza
+        cita = self.crear_cita(time(9, 0), self.mecanico_a)
+
+        respuesta = self.reasignar(cita, self.mecanico_b)
+
+        self.assertEqual(cita.mecanico, self.mecanico_b)
+        self.assertContains(respuesta, 'Cita reasignada')
+
+    def test_rechaza_si_el_mecanico_tiene_cita_que_se_cruza(self):
+        for hora_ocupada in (time(9, 0), time(9, 30)):  # misma hora y traslape
+            with self.subTest(hora_ocupada=hora_ocupada):
+                otra = self.crear_cita(hora_ocupada, self.mecanico_b)
+                cita = self.crear_cita(time(9, 0), self.mecanico_a)
+
+                respuesta = self.reasignar(cita, self.mecanico_b)
+
+                self.assertEqual(cita.mecanico, self.mecanico_a)
+                self.assertContains(respuesta, 'no está disponible')
+                otra.delete()
+                cita.delete()
+
+    def test_cita_cancelada_no_ocupa_al_mecanico(self):
+        self.crear_cita(time(9, 0), self.mecanico_b, estado=Cita.ESTADO_CANCELADA)
+        cita = self.crear_cita(time(9, 0), self.mecanico_a)
+
+        self.reasignar(cita, self.mecanico_b)
+
+        self.assertEqual(cita.mecanico, self.mecanico_b)

@@ -1,12 +1,52 @@
 """Lógica de negocio (services) para la gestión de citas."""
 
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
 from django.conf import settings
 
 from apps.core.emails import enviar_correo_html
+from apps.usuarios.models import Mecanico
 
 from .models import Cita
+
+
+# ---------------------------------------------------------------------------
+# Disponibilidad de mecánicos (reasignación de citas)
+# ---------------------------------------------------------------------------
+# Estados en los que una cita ocupa el tiempo del mecánico.
+ESTADOS_ACTIVOS = (Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA, Cita.ESTADO_EN_PROCESO)
+
+
+def _rango(cita: Cita) -> tuple[datetime, datetime]:
+    """Inicio y fin de la cita según la duración de sus servicios."""
+    inicio = datetime.combine(cita.fecha, cita.hora)
+    minutos = sum(sc.servicio.duracion_estimada for sc in cita.serviciocita_set.all())
+    return inicio, inicio + timedelta(minutes=minutos)
+
+
+def _citas_que_se_cruzan(cita: Cita, **filtros):
+    """Citas activas con mecánico que se cruzan con el horario de ``cita``."""
+    inicio, fin = _rango(cita)
+    otras = (
+        Cita.objects.filter(fecha=cita.fecha, estado__in=ESTADOS_ACTIVOS, mecanico__isnull=False, **filtros)
+        .exclude(id=cita.id)
+        .prefetch_related('serviciocita_set__servicio')
+    )
+    for otra in otras:
+        otra_inicio, otra_fin = _rango(otra)
+        if otra_inicio == inicio or (inicio < otra_fin and otra_inicio < fin):
+            yield otra
+
+
+def cita_en_conflicto(mecanico: Mecanico, cita: Cita) -> Cita | None:
+    """Primera cita del mecánico que choca con ``cita``, o None si está libre."""
+    return next(_citas_que_se_cruzan(cita, mecanico=mecanico), None)
+
+
+def mecanicos_disponibles(cita: Cita):
+    """Mecánicos activos libres en el horario de ``cita``."""
+    ocupados = {otra.mecanico_id for otra in _citas_que_se_cruzan(cita)}
+    return Mecanico.objects.filter(activo=True).exclude(pk__in=ocupados).order_by('apellido', 'nombre')
 
 
 def _cita_con_detalles(cita_id: int) -> tuple[Cita, list]:

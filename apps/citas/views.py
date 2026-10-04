@@ -17,6 +17,8 @@ from apps.vehiculos.models import Motocicleta
 from .models import Cita, CambioEstadoCita, RepuestoUsado, ServicioCita
 from .totales import calcular_detalle_cita, precio_valido
 from .services import (
+    cita_en_conflicto,
+    mecanicos_disponibles,
     notificar_cita_agendada,
     notificar_cita_cancelada,
     notificar_cita_confirmada,
@@ -526,7 +528,6 @@ def cita_admin_detalle(request, cita_id):
     cita = get_object_or_404(Cita, id=cita_id)
     servicios = cita.serviciocita_set.select_related('servicio').all()
     cambios = cita.cambios_estado.select_related('realizado_por').all()
-    mecanicos = Mecanico.objects.filter(activo=True).order_by('apellido', 'nombre')
 
     TRANSICIONES = {
         Cita.ESTADO_PENDIENTE:  [Cita.ESTADO_CONFIRMADA, Cita.ESTADO_CANCELADA],
@@ -553,27 +554,33 @@ def cita_admin_detalle(request, cita_id):
                 messages.error(request, 'No se puede asignar mecánico a esta cita.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
             mecanico_dui = request.POST.get('mecanico_dui', '').strip()
-            if mecanico_dui:
-                try:
-                    mecanico = Mecanico.objects.get(dui=mecanico_dui, activo=True)
-                    conflicto = Cita.objects.filter(
-                        mecanico=mecanico,
-                        fecha=cita.fecha,
-                        hora=cita.hora,
-                        estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA, Cita.ESTADO_EN_PROCESO],
-                    ).exclude(id=cita.id).exists()
-                    if conflicto:
-                        messages.error(request, f'{mecanico.nombre} {mecanico.apellido} ya tiene otra cita el {cita.fecha} a las {cita.hora.strftime("%H:%M")}.')
-                        return redirect('citas:cita_admin_detalle', cita_id=cita.id)
-                    cita.mecanico = mecanico
-                    cita.save()
-                    messages.success(request, f'Mecánico asignado: {mecanico.nombre} {mecanico.apellido}.')
-                except Mecanico.DoesNotExist:
-                    messages.error(request, 'Mecánico no válido.')
-            else:
+            if not mecanico_dui:
                 cita.mecanico = None
-                cita.save()
+                cita.save(update_fields=['mecanico'])
                 messages.success(request, 'Mecánico removido de la cita.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            # El bloqueo evita que dos administradores asignen al mismo mecánico
+            # en horarios cruzados al mismo tiempo.
+            with transaction.atomic():
+                mecanico = Mecanico.objects.select_for_update().filter(dui=mecanico_dui, activo=True).first()
+                conflicto = cita_en_conflicto(mecanico, cita) if mecanico else None
+                reasignada = cita.mecanico_id is not None
+                if mecanico and not conflicto:
+                    cita.mecanico = mecanico
+                    cita.save(update_fields=['mecanico'])
+
+            if not mecanico:
+                messages.error(request, 'Mecánico no válido.')
+            elif conflicto:
+                messages.error(
+                    request,
+                    f'{mecanico.nombre} {mecanico.apellido} no está disponible: ya tiene la cita #{conflicto.id} '
+                    f'a las {conflicto.hora.strftime("%H:%M")}, que se cruza con este horario.',
+                )
+            else:
+                accion_hecha = 'Cita reasignada a' if reasignada else 'Mecánico asignado:'
+                messages.success(request, f'{accion_hecha} {mecanico.nombre} {mecanico.apellido}.')
             return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
         elif accion == 'cambiar_estado':
@@ -722,7 +729,8 @@ def cita_admin_detalle(request, cita_id):
         'cambios': cambios,
         'estados_posibles': estados_posibles,
         'estados_display': dict(Cita.ESTADOS),
-        'mecanicos': mecanicos,
+        # Solo mecánicos libres en el horario de la cita (incluye al actual).
+        'mecanicos': mecanicos_disponibles(cita) if puede_asignar_mecanico else [],
         'puede_asignar_mecanico': puede_asignar_mecanico,
         'opciones_estado': [(c, dict(Cita.ESTADOS)[c]) for c in opciones_estado_genericas],
         'puede_finalizar': puede_finalizar,
