@@ -25,6 +25,8 @@ from .reporte_pdf import generar_reporte_pdf
 from .reportes import calcular_reporte_servicios
 from .ticket_pdf import generar_ticket_pdf
 from .services import (
+    cita_en_conflicto,
+    mecanicos_disponibles,
     notificar_cita_agendada,
     notificar_cita_cancelada,
     notificar_cita_completada,
@@ -590,7 +592,6 @@ def cita_admin_detalle(request, cita_id):
     cita = get_object_or_404(Cita, id=cita_id)
     servicios = cita.serviciocita_set.select_related('servicio').all()
     cambios = cita.cambios_estado.select_related('realizado_por', 'estado_anterior', 'estado_nuevo').all()
-    mecanicos = Mecanico.objects.filter(activo=True).order_by('apellido', 'nombre')
 
     # el flujo lo define el tipo de cada estado (ver EstadoCita.siguientes_posibles)
     estados_posibles = cita.estado.siguientes_posibles()
@@ -612,27 +613,33 @@ def cita_admin_detalle(request, cita_id):
                 messages.error(request, 'No se puede asignar mecánico a esta cita.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
             mecanico_dui = request.POST.get('mecanico_dui', '').strip()
-            if mecanico_dui:
-                try:
-                    mecanico = Mecanico.objects.get(dui=mecanico_dui, activo=True)
-                    conflicto = Cita.objects.filter(
-                        mecanico=mecanico,
-                        fecha=cita.fecha,
-                        hora=cita.hora,
-                        estado__tipo__in=[EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO],
-                    ).exclude(id=cita.id).exists()
-                    if conflicto:
-                        messages.error(request, f'{mecanico.nombre} {mecanico.apellido} ya tiene otra cita el {cita.fecha} a las {cita.hora.strftime("%H:%M")}.')
-                        return redirect('citas:cita_admin_detalle', cita_id=cita.id)
-                    cita.mecanico = mecanico
-                    cita.save()
-                    messages.success(request, f'Mecánico asignado: {mecanico.nombre} {mecanico.apellido}.')
-                except Mecanico.DoesNotExist:
-                    messages.error(request, 'Mecánico no válido.')
-            else:
+            if not mecanico_dui:
                 cita.mecanico = None
-                cita.save()
+                cita.save(update_fields=['mecanico'])
                 messages.success(request, 'Mecánico removido de la cita.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            # El bloqueo evita que dos administradores asignen al mismo mecánico
+            # en horarios cruzados al mismo tiempo.
+            with transaction.atomic():
+                mecanico = Mecanico.objects.select_for_update().filter(dui=mecanico_dui, activo=True).first()
+                conflicto = cita_en_conflicto(mecanico, cita) if mecanico else None
+                reasignada = cita.mecanico_id is not None
+                if mecanico and not conflicto:
+                    cita.mecanico = mecanico
+                    cita.save(update_fields=['mecanico'])
+
+            if not mecanico:
+                messages.error(request, 'Mecánico no válido.')
+            elif conflicto:
+                messages.error(
+                    request,
+                    f'{mecanico.nombre} {mecanico.apellido} no está disponible: ya tiene la cita #{conflicto.id} '
+                    f'a las {conflicto.hora.strftime("%H:%M")}, que se cruza con este horario.',
+                )
+            else:
+                accion_hecha = 'Cita reasignada a' if reasignada else 'Mecánico asignado:'
+                messages.success(request, f'{accion_hecha} {mecanico.nombre} {mecanico.apellido}.')
             return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
         elif accion == 'cambiar_estado':
@@ -789,7 +796,8 @@ def cita_admin_detalle(request, cita_id):
         'servicios': servicios,
         'cambios': cambios,
         'estados_posibles': estados_posibles,
-        'mecanicos': mecanicos,
+        # Solo mecánicos libres en el horario de la cita (incluye al actual).
+        'mecanicos': mecanicos_disponibles(cita) if puede_asignar_mecanico else [],
         'puede_asignar_mecanico': puede_asignar_mecanico,
         'opciones_estado': opciones_estado_genericas,
         'puede_finalizar': puede_finalizar,
