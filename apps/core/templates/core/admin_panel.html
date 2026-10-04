@@ -1,74 +1,118 @@
 {% extends 'core/base.html' %}
 
-{% block title %}Panel del administrador · Taller{% endblock %}
+{% block title %}Inicio · Administrador · Taller{% endblock %}
+{% block topbar_title %}inicio / administrador{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Panel del administrador</h1>
+<div class="welcome">
+    <div>
+        <p class="eyebrow mb-1">centro de control</p>
+        <h1>Hola, {{ user.nombre }}</h1>
+    </div>
+    <span class="date">{{ hoy|date:"l d \d\e F Y" }}</span>
+</div>
 
-<div class="row g-3">
-    <div class="col-md-4">
-        <a href="{% url 'core:dashboard' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Dashboard</h5>
-                <p class="card-text text-muted small">KPIs del taller y alerta de stock bajo.</p>
+<div class="stat-grid">
+    <a href="{% url 'citas:calendario' %}?modo=dia" class="stat-card">
+        <span class="stat-label">{% include 'core/_icon.html' with name='citas' %}citas de hoy</span>
+        <div class="stat-value">{{ citas_hoy }}</div>
+        <p class="stat-hint">Programadas para atender hoy</p>
+    </a>
+    <a href="{% url 'citas:calendario' %}?estado=pendiente" class="stat-card stat-amber">
+        <span class="stat-label">{% include 'core/_icon.html' with name='disponibilidad' %}pendientes</span>
+        <div class="stat-value">{{ citas_pendientes }}</div>
+        <p class="stat-hint">Por confirmar o asignar mecánico</p>
+    </a>
+    <a href="{% url 'usuarios:clientes_lista' %}" class="stat-card stat-green">
+        <span class="stat-label">{% include 'core/_icon.html' with name='clientes' %}clientes activos</span>
+        <div class="stat-value">{{ clientes_activos }}</div>
+        <p class="stat-hint">Registrados en el sistema</p>
+    </a>
+    <a href="{% url 'productos:inventario' %}" class="stat-card {% if productos_stock_bajo %}stat-red{% else %}stat-green{% endif %}">
+        <span class="stat-label">{% include 'core/_icon.html' with name='productos' %}stock bajo</span>
+        <div class="stat-value">{{ productos_stock_bajo }}</div>
+        <p class="stat-hint">{% if productos_stock_bajo %}Productos bajo el mínimo{% else %}Inventario en orden{% endif %}</p>
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="section-title">
+            <h2 class="h6">Próximas citas</h2>
+            <a href="{% url 'citas:calendario' %}" class="btn btn-sm btn-outline-dark">Ver calendario</a>
+        </div>
+        <div class="list-panel">
+            {% if proximas_citas %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-muted fw-normal small">FECHA</th>
+                            <th class="text-muted fw-normal small">CLIENTE</th>
+                            <th class="text-muted fw-normal small">MOTO</th>
+                            <th class="text-muted fw-normal small">MECÁNICO</th>
+                            <th class="text-muted fw-normal small">ESTADO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cita in proximas_citas %}
+                        <tr>
+                            <td class="mono">{{ cita.fecha|date:"d M" }} · {{ cita.hora|time:"H:i" }}</td>
+                            <td>
+                                <a href="{% url 'citas:cita_admin_detalle' cita.id %}" class="text-decoration-none">{{ cita.cliente.nombre_completo }}</a>
+                            </td>
+                            <td class="mono">{{ cita.motocicleta.placa }}</td>
+                            <td>{% if cita.mecanico %}{{ cita.mecanico.nombre }}{% else %}<span class="text-muted">Sin asignar</span>{% endif %}</td>
+                            <td><span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        </a>
+            {% else %}
+            <div class="empty">No hay citas próximas.</div>
+            {% endif %}
+        </div>
     </div>
-    <div class="col-md-4">
-        <a href="{% url 'citas:calendario' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Citas</h5>
-                <p class="card-text text-muted small">Calendario y gestión de todas las citas.</p>
+
+    <div class="col-lg-5">
+        <div class="section-title">
+            <h2 class="h6">Accesos rápidos</h2>
+        </div>
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <a href="{% url 'citas:disponibilidad' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='disponibilidad' %}</span>
+                        <div><h5 class="card-title">Disponibilidad</h5><p class="card-text small">Slots libres por fecha.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{% url 'citas:disponibilidad' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Disponibilidad</h5>
-                <p class="card-text text-muted small">Consultar slots libres por fecha y servicio.</p>
+            <div class="col-sm-6">
+                <a href="{% url 'servicios:catalogo_servicios' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='servicios' %}</span>
+                        <div><h5 class="card-title">Servicios</h5><p class="card-text small">Catálogo del taller.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{% url 'usuarios:clientes_lista' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Clientes</h5>
-                <p class="card-text text-muted small">Listado y gestión de clientes registrados.</p>
+            <div class="col-sm-6">
+                <a href="{% url 'usuarios:usuarios_lista' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='usuarios' %}</span>
+                        <div><h5 class="card-title">Usuarios</h5><p class="card-text small">Mecánicos y admins.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{% url 'servicios:catalogo_servicios' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Servicios</h5>
-                <p class="card-text text-muted small">Catálogo de servicios del taller.</p>
+            <div class="col-sm-6">
+                <a href="{% url 'configuracion:horario' %}" class="card dashboard-card text-decoration-none h-100">
+                    <div class="card-body">
+                        <span class="icon">{% include 'core/_icon.html' with name='horario' %}</span>
+                        <div><h5 class="card-title">Horario</h5><p class="card-text small">Días y horas de atención.</p></div>
+                    </div>
+                </a>
             </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{% url 'productos:inventario' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Productos</h5>
-                <p class="card-text text-muted small">Inventario de repuestos e insumos.</p>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{% url 'usuarios:usuarios_lista' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Usuarios</h5>
-                <p class="card-text text-muted small">Mecánicos y administradores del sistema.</p>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="{% url 'configuracion:horario' %}" class="card text-decoration-none text-dark h-100">
-            <div class="card-body">
-                <h5 class="card-title">Horario</h5>
-                <p class="card-text text-muted small">Configuración del horario de atención.</p>
-            </div>
-        </a>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -123,10 +123,13 @@
     <div class="row mb-3">
         <label for="nueva_contrasena" class="col-sm-3 col-form-label">Nueva contraseña</label>
         <div class="col-sm-9">
-            <input type="password" id="nueva_contrasena" name="nueva_contrasena"
-                   class="form-control"
-                   autocomplete="new-password"
-                   placeholder="Mínimo 8 caracteres">
+            <div class="input-group">
+                <input type="password" id="nueva_contrasena" name="nueva_contrasena"
+                       class="form-control"
+                       autocomplete="new-password"
+                       placeholder="Mínimo 8 caracteres">
+                {% include "core/_pw_toggle_boton.html" with input_id="nueva_contrasena" %}
+            </div>
         </div>
     </div>
 

@@ -26,7 +26,7 @@ EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 EMAIL_HOST=smtp.resend.com
 EMAIL_PORT=587
 EMAIL_HOST_USER=resend
-RESEND_API_KEY=
+EMAIL_HOST_PASSWORD=
 EMAIL_USE_TLS=True
 EMAIL_TIMEOUT=10
 DEFAULT_FROM_EMAIL=Sistema del Taller <onboarding@resend.dev>
@@ -37,7 +37,7 @@ TALLER_EMAIL_CONTACTO=
 ```
 
 - `EMAIL_BACKEND`: consola, memoria o SMTP. Para envío real establecer `django.core.mail.backends.smtp.EmailBackend`.
-- `RESEND_API_KEY`: credencial secreta utilizada como contraseña SMTP; no colocar la contraseña de Gmail.
+- `EMAIL_HOST_PASSWORD`: credencial secreta utilizada como contraseña SMTP (antes se llamaba `RESEND_API_KEY`; se renombró porque ahora también se usa con Gmail SMTP, no solo con Resend). Con Gmail debe ser una contraseña de aplicación (con verificación en 2 pasos activada), nunca la contraseña normal de la cuenta.
 - `DEFAULT_FROM_EMAIL`: remitente autorizado por el proveedor.
 - Las variables `TALLER_*` personalizan la firma. No inventar datos de contacto; los campos opcionales vacíos no se muestran.
 

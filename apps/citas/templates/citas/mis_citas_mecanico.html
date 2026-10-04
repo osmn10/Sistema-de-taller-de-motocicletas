@@ -3,7 +3,7 @@
 {% block title %}Citas del taller — Taller de Motos{% endblock %}
 
 {% block content %}
-<p class="text-muted small mb-1">CITAS DEL TALLER</p>
+<p class="eyebrow mb-1">CITAS DEL TALLER</p>
 <h2 class="mb-4">Citas programadas</h2>
 
 <form method="get" action="{% url 'citas:mis_citas_mecanico' %}" class="row g-3 mb-4">
@@ -54,7 +54,7 @@
                 <td>{{ cita.motocicleta }}</td>
                 <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
                 <td>
-                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                    <span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span>
                 </td>
             </tr>
             {% endfor %}
