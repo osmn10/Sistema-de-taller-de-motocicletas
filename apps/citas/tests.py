@@ -1,9 +1,12 @@
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from io import BytesIO
 from unittest.mock import patch
 
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from openpyxl import load_workbook
 from django.utils import timezone
 
 from apps.configuracion.models import HorarioTaller
@@ -14,6 +17,7 @@ from apps.usuarios.models import Mecanico, Usuario
 from apps.vehiculos.models import Motocicleta
 
 from .models import Cita, EstadoCita, RepuestoUsado, ServicioCita
+from .reportes import calcular_reporte_servicios
 from .services import (
     notificar_cita_agendada,
     notificar_cita_cancelada,
@@ -937,6 +941,178 @@ class HorariosPasadosTests(TestCase):
         cita.refresh_from_db()
         self.assertEqual(cita.fecha, self.HOY + timedelta(days=2))
         self.assertEqual(cita.hora, time(9, 0))
+
+
+class ReporteServiciosTests(TestCase):
+    """V2SCRUM-39: reporte de servicios por período, filtros y export."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = Usuario.objects.create_admin(
+            dui='20000000-1', password='admin123', nombre='Ana', apellido='Admin',
+            telefono='7000-0001', email='ana-admin@example.com',
+        )
+        cls.cliente = Usuario.objects.create_cliente(
+            dui='20000000-2', password='cliente123', nombre='Pedro', apellido='Cliente',
+            telefono='7000-0002', email='pedro@example.com', direccion='San Miguel',
+        )
+        cls.mecanico1 = Usuario.objects.create_mecanico(
+            dui='20000000-3', password='mecanico123', nombre='Beto', apellido='Alfa',
+            telefono='7000-0003', email='beto@example.com',
+            especialidad=Mecanico.ESPECIALIDAD_MECANICA_GENERAL,
+        )
+        cls.mecanico2 = Usuario.objects.create_mecanico(
+            dui='20000000-4', password='mecanico123', nombre='Carla', apellido='Beta',
+            telefono='7000-0004', email='carla@example.com',
+            especialidad=Mecanico.ESPECIALIDAD_MOTOR,
+        )
+        cls.motocicleta = Motocicleta.objects.create(
+            placa='M-9000', cliente=cls.cliente, marca='Honda', modelo='CG 150',
+            anio=2023, color='Negro',
+        )
+        cls.aceite = Servicio.objects.create(
+            nombre='Cambio de aceite', precio_base='15.00', duracion_estimada=30,
+        )
+        cls.afinamiento = Servicio.objects.create(
+            nombre='Afinamiento general', precio_base='20.00', duracion_estimada=60,
+        )
+
+        est_inicio = EstadoCita.objects.get(tipo=EstadoCita.TIPO_INICIO)
+        est_completado = EstadoCita.objects.get(tipo=EstadoCita.TIPO_COMPLETADO)
+        est_cancelado = EstadoCita.objects.get(tipo=EstadoCita.TIPO_CANCELADO)
+        cls.est_inicio, cls.est_completado, cls.est_cancelado = est_inicio, est_completado, est_cancelado
+
+        hoy = date.today()
+
+        # Dentro del período, completadas: 2 servicios de aceite + 1 de afinamiento,
+        # repartidas 2 citas con mecanico1.
+        cls._crear_cita(hoy, cls.est_completado, cls.mecanico1, [cls.aceite])
+        cls._crear_cita(hoy, cls.est_completado, cls.mecanico1, [cls.aceite, cls.afinamiento])
+        # Dentro del período, pendiente (cuenta como demanda, no como ingreso/completada).
+        cls._crear_cita(hoy, cls.est_inicio, cls.mecanico2, [cls.aceite])
+        # Dentro del período, cancelada: no debe contar para nada.
+        cls._crear_cita(hoy, cls.est_cancelado, cls.mecanico2, [cls.aceite])
+        # Fuera del período (60 días atrás): no debe contar para nada.
+        cls._crear_cita(hoy - timedelta(days=60), cls.est_completado, cls.mecanico1, [cls.aceite])
+
+    @classmethod
+    def _crear_cita(cls, fecha, estado, mecanico, servicios):
+        cita = Cita.objects.create(
+            cliente=cls.cliente, motocicleta=cls.motocicleta, mecanico=mecanico,
+            fecha=fecha, hora=time(9, 0), estado=estado,
+        )
+        for servicio in servicios:
+            ServicioCita.objects.create(
+                cita=cita, servicio=servicio, precio_final=servicio.precio_base,
+            )
+        return cita
+
+    # --- cálculo (apps/citas/reportes.py) ---
+
+    def test_kpis_del_periodo_sin_filtros(self):
+        datos = calcular_reporte_servicios(date.today(), date.today())
+
+        self.assertEqual(datos['total_citas'], 3)  # completadas + pendiente, sin cancelada
+        self.assertEqual(datos['servicios_completados'], 2)
+        self.assertEqual(datos['ingresos_totales'], Decimal('50.00'))  # 15 + (15+20)
+
+    def test_servicios_mas_solicitados_ordenados_por_cantidad(self):
+        datos = calcular_reporte_servicios(date.today(), date.today())
+        top = datos['servicios_top']
+
+        self.assertEqual(top[0]['servicio__nombre'], 'Cambio de aceite')
+        self.assertEqual(top[0]['cantidad'], 3)  # 2 completadas + 1 pendiente
+        self.assertEqual(top[1]['servicio__nombre'], 'Afinamiento general')
+        self.assertEqual(top[1]['cantidad'], 1)
+
+    def test_mecanico_con_mas_servicios(self):
+        datos = calcular_reporte_servicios(date.today(), date.today())
+        top = datos['mecanicos_top']
+
+        self.assertEqual(top[0]['mecanico__dui'], self.mecanico1.dui)
+        self.assertEqual(top[0]['cantidad'], 2)
+        self.assertEqual(top[1]['mecanico__dui'], self.mecanico2.dui)
+        self.assertEqual(top[1]['cantidad'], 1)
+
+    def test_cancelada_no_cuenta_para_nada(self):
+        datos = calcular_reporte_servicios(date.today(), date.today())
+        total_aceite = sum(
+            f['cantidad'] for f in datos['servicios_top'] if f['servicio__nombre'] == 'Cambio de aceite'
+        )
+        # 3 (completadas + pendiente), NO 4: la cancelada quedó fuera.
+        self.assertEqual(total_aceite, 3)
+
+    def test_fuera_de_rango_no_cuenta(self):
+        datos = calcular_reporte_servicios(date.today(), date.today())
+        self.assertEqual(datos['total_citas'], 3)  # no las 4 activas totales
+
+    def test_filtro_por_servicio_acota_las_citas(self):
+        datos = calcular_reporte_servicios(
+            date.today(), date.today(), servicio_id=self.afinamiento.id,
+        )
+        # Solo la cita que tiene afinamiento (la que además tiene aceite).
+        self.assertEqual(datos['total_citas'], 1)
+        self.assertEqual(datos['ingresos_totales'], Decimal('35.00'))
+
+    def test_filtro_por_mecanico_acota_las_citas(self):
+        datos = calcular_reporte_servicios(
+            date.today(), date.today(), mecanico_dui=self.mecanico2.dui,
+        )
+        self.assertEqual(datos['total_citas'], 1)  # solo la pendiente (la cancelada no cuenta)
+        self.assertEqual(datos['servicios_completados'], 0)
+        self.assertEqual(datos['ingresos_totales'], Decimal('0.00'))
+
+    # --- vista y permisos ---
+
+    def test_requiere_admin(self):
+        self.client.force_login(self.cliente)
+        respuesta = self.client.get(reverse('citas:reporte_servicios'))
+        self.assertEqual(respuesta.status_code, 302)
+
+    def test_admin_ve_el_reporte(self):
+        self.client.force_login(self.admin)
+        respuesta = self.client.get(reverse('citas:reporte_servicios'))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.context['total_citas'], 3)
+
+    # --- exports ---
+
+    def test_export_pdf(self):
+        self.client.force_login(self.admin)
+        respuesta = self.client.get(reverse('citas:reporte_servicios'), {'export': 'pdf'})
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta['Content-Type'], 'application/pdf')
+        self.assertIn('attachment', respuesta['Content-Disposition'])
+        self.assertTrue(respuesta.content.startswith(b'%PDF'))
+
+    def test_export_excel_es_un_xlsx_valido_con_los_datos(self):
+        self.client.force_login(self.admin)
+        respuesta = self.client.get(reverse('citas:reporte_servicios'), {'export': 'xlsx'})
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(
+            respuesta['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+        libro = load_workbook(BytesIO(respuesta.content))
+        self.assertEqual(
+            libro.sheetnames, ['Resumen', 'Servicios más solicitados', 'Mecánicos'],
+        )
+        resumen = libro['Resumen']
+        self.assertEqual(resumen['A4'].value, 'Citas del período')
+        self.assertEqual(resumen['B4'].value, 3)
+        self.assertEqual(resumen['B6'].value, 50.0)
+
+    def test_export_respeta_los_filtros_aplicados(self):
+        self.client.force_login(self.admin)
+        respuesta = self.client.get(reverse('citas:reporte_servicios'), {
+            'export': 'xlsx', 'mecanico': self.mecanico2.dui,
+        })
+
+        libro = load_workbook(BytesIO(respuesta.content))
+        self.assertEqual(libro['Resumen']['B4'].value, 1)
 
 
 class ReasignarMecanicoTests(TestCase):
