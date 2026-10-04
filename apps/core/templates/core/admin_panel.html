@@ -18,7 +18,7 @@
         <div class="stat-value">{{ citas_hoy }}</div>
         <p class="stat-hint">Programadas para atender hoy</p>
     </a>
-    <a href="{% url 'citas:calendario' %}?estado=pendiente" class="stat-card stat-amber">
+    <a href="{% url 'citas:calendario' %}?estado={{ estado_inicial.codigo }}" class="stat-card stat-amber">
         <span class="stat-label">{% include 'core/_icon.html' with name='disponibilidad' %}pendientes</span>
         <div class="stat-value">{{ citas_pendientes }}</div>
         <p class="stat-hint">Por confirmar o asignar mecánico</p>
@@ -63,7 +63,7 @@
                             </td>
                             <td class="mono">{{ cita.motocicleta.placa }}</td>
                             <td>{% if cita.mecanico %}{{ cita.mecanico.nombre }}{% else %}<span class="text-muted">Sin asignar</span>{% endif %}</td>
-                            <td><span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span></td>
+                            <td><span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span></td>
                         </tr>
                         {% endfor %}
                     </tbody>

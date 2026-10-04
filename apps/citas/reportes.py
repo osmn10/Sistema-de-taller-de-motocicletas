@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from django.db.models import Count
 
-from .models import Cita, ServicioCita
+from .models import Cita, EstadoCita, ServicioCita
 from .totales import calcular_detalle_cita
 
 
@@ -25,7 +25,7 @@ def calcular_reporte_servicios(desde, hasta, servicio_id=None, mecanico_dui=None
     """
 
     citas_periodo = Cita.objects.filter(fecha__gte=desde, fecha__lte=hasta)
-    citas_activas = citas_periodo.exclude(estado=Cita.ESTADO_CANCELADA)
+    citas_activas = citas_periodo.exclude(estado__tipo=EstadoCita.TIPO_CANCELADO)
 
     if servicio_id:
         citas_activas = citas_activas.filter(servicios__id=servicio_id).distinct()
@@ -49,7 +49,7 @@ def calcular_reporte_servicios(desde, hasta, servicio_id=None, mecanico_dui=None
     )
 
     # Ingresos: solo citas completadas, dentro de los filtros aplicados.
-    completadas = citas_activas.filter(estado=Cita.ESTADO_COMPLETADA)
+    completadas = citas_activas.filter(estado__tipo=EstadoCita.TIPO_COMPLETADO)
     ingresos_totales = Decimal('0.00')
     for cita in completadas.prefetch_related(
         'serviciocita_set__servicio',

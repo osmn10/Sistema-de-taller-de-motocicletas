@@ -8,8 +8,8 @@
 
 <div class="mt-3 mb-4 d-flex align-items-center gap-3">
     <h2 class="mb-0">Cita #{{ cita.id }}</h2>
-    <span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">
-        {{ cita.get_estado_display }}
+    <span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">
+        {{ cita.estado.nombre }}
     </span>
 </div>
 
@@ -94,7 +94,7 @@
             {% endif %}
             {% if detalle_economico.es_referencial %}
             <p class="alert alert-warning small">Hay repuestos anteriores a este cálculo sin precio histórico guardado. Se usa su precio actual solo como referencia: este importe no confirma lo cobrado y puede cambiar si cambia el catálogo.</p>
-            {% elif cita.estado != 'completada' %}
+            {% elif cita.estado.tipo != 'completado' %}
             <p class="small text-muted">Importe de lo registrado hasta ahora; los repuestos seleccionados al cerrar se suman en el resumen antes de finalizar.</p>
             {% endif %}
         </section>
@@ -203,8 +203,8 @@
                 <div class="col-sm-9">
                     <select name="nuevo_estado" class="form-select" required>
                         <option value="">Seleccioná un estado</option>
-                        {% for codigo, etiqueta in opciones_estado %}
-                        <option value="{{ codigo }}">{{ etiqueta }}</option>
+                        {% for estado in opciones_estado %}
+                        <option value="{{ estado.codigo }}">{{ estado.nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -230,7 +230,7 @@
         {% for cambio in cambios %}
         <div class="border rounded p-3 mb-2">
             <p class="small mb-1">
-                <strong>{{ cambio.estado_anterior }} → {{ cambio.estado_nuevo }}</strong>
+                <strong>{{ cambio.estado_anterior.nombre }} → {{ cambio.estado_nuevo.nombre }}</strong>
             </p>
             <p class="small text-muted mb-1">
                 {{ cambio.fecha_cambio|date:"j N Y H:i" }} —

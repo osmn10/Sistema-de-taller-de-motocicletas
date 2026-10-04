@@ -107,11 +107,11 @@ class Command(BaseCommand):
 
     def _seed_proveedores_y_productos(self):
         prov1 = Proveedor.objects.create(
-            nit='0614-150385-101-2', nombre='Repuestos del Oriente S.A. de C.V.',
+            nombre='Repuestos del Oriente S.A. de C.V.',
             telefono='2660-1234', email='ventas@repuestosoriente.com',
         )
         prov2 = Proveedor.objects.create(
-            nit='0210-220490-102-5', nombre='MotoPartes El Salvador',
+            nombre='MotoPartes El Salvador',
             telefono='2225-6789', email='contacto@motopartessv.com',
         )
         self.stdout.write('  · 2 proveedores creados')
@@ -168,19 +168,19 @@ class Command(BaseCommand):
         hoy = date.today()
         # (dui_cliente, placa, dias_desde_hoy, hora, estado, [nombres_servicios])
         plan = [
-            ('11111111-1', 'M-1234', 3,   time(9, 0),  Cita.ESTADO_PENDIENTE,  ['Cambio de aceite']),
-            ('11111111-1', 'M-1234', 5,   time(10, 0), Cita.ESTADO_CONFIRMADA, ['Afinamiento general', 'Ajuste y lubricación de cadena']),
-            ('11111111-1', 'M-5678', -10, time(8, 30), Cita.ESTADO_COMPLETADA, ['Cambio de aceite', 'Revisión eléctrica']),
-            ('11111111-1', 'M-1234', 2,   time(11, 0), Cita.ESTADO_CANCELADA,  ['Cambio de pastillas de freno']),
-            ('22222222-2', 'M-2222', 4,   time(9, 0),  Cita.ESTADO_PENDIENTE,  ['Afinamiento general']),
-            ('33333333-3', 'M-3333', -5,  time(14, 0), Cita.ESTADO_COMPLETADA, ['Cambio de llantas']),
+            ('11111111-1', 'M-1234', 3,   time(9, 0),  'pendiente',  ['Cambio de aceite']),
+            ('11111111-1', 'M-1234', 5,   time(10, 0), 'confirmada', ['Afinamiento general', 'Ajuste y lubricación de cadena']),
+            ('11111111-1', 'M-5678', -10, time(8, 30), 'completada', ['Cambio de aceite', 'Revisión eléctrica']),
+            ('11111111-1', 'M-1234', 2,   time(11, 0), 'cancelada',  ['Cambio de pastillas de freno']),
+            ('22222222-2', 'M-2222', 4,   time(9, 0),  'pendiente',  ['Afinamiento general']),
+            ('33333333-3', 'M-3333', -5,  time(14, 0), 'completada', ['Cambio de llantas']),
         ]
         for dui, placa, delta, hora, estado, nombres in plan:
             cliente = clientes[dui]
             moto = Motocicleta.objects.get(placa=placa)
             cita = Cita.objects.create(
                 cliente=cliente, motocicleta=moto, mecanico=None,
-                fecha=hoy + timedelta(days=delta), hora=hora, estado=estado,
+                fecha=hoy + timedelta(days=delta), hora=hora, estado_id=estado,
             )
             for nombre in nombres:
                 servicio = servicios[nombre]

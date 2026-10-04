@@ -53,7 +53,7 @@
                 <td class="mono">{{ cita.hora|time:'H:i' }}</td>
                 <td>{{ cita.cliente.nombre_completo }}</td>
                 <td class="mono">{{ cita.motocicleta.placa }}</td>
-                <td><span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span></td>
+                <td><span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span></td>
                 <td class="text-end">
                     <a href="{% url 'citas:cita_admin_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>
                 </td>
@@ -121,9 +121,9 @@
 
     <select name="estado" class="form-select w-auto" aria-label="Filtrar por estado" onchange="this.form.submit()">
         <option value="">Todos los estados</option>
-        {% for valor, nombre in estados %}
-        <option value="{{ valor }}" {% if filtro_estado == valor %}selected{% endif %}>
-            {{ nombre }}
+        {% for estado in estados %}
+        <option value="{{ estado.codigo }}" {% if filtro_estado == estado.codigo %}selected{% endif %}>
+            {{ estado.nombre }}{% if not estado.activo %} (inactivo){% endif %}
         </option>
         {% endfor %}
     </select>

@@ -13,7 +13,7 @@ from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
-from apps.citas.models import Cita, ServicioCita
+from apps.citas.models import Cita, EstadoCita, ServicioCita
 from apps.core.emails import enviar_correo_html
 from apps.productos.models import Producto
 from apps.servicios.models import Servicio
@@ -225,7 +225,7 @@ class DashboardTests(TestCase):
 
         cita = Cita.objects.create(
             cliente=cls.cliente, motocicleta=cls.moto, fecha=date.today(),
-            hora=time(9, 0), estado=Cita.ESTADO_COMPLETADA,
+            hora=time(9, 0), estado=EstadoCita.objects.get(tipo=EstadoCita.TIPO_COMPLETADO),
         )
         ServicioCita.objects.create(
             cita=cita, servicio=cls.servicio, precio_final=Decimal('25.00'),

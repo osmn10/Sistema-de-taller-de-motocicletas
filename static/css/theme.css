@@ -821,6 +821,7 @@ input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(.8) sepia
 .status-cancelada, .status-off { --sb: var(--neon-red); --sb-rgb: var(--neon-red-rgb); }
 .status-en_proceso { --sb: #c084fc; --sb-rgb: 192, 132, 252; }
 .status-en_proceso::before, .status-pendiente::before { animation: pulse 1.6s ease-in-out infinite; }
+.status-inicio::before, .status-proceso::before { animation: pulse 1.6s ease-in-out infinite; }
 
 .badge.text-bg-warning { background-color: rgba(var(--neon-amber-rgb), .18) !important; color: var(--neon-amber) !important; border: 1px solid rgba(var(--neon-amber-rgb), .5); }
 
