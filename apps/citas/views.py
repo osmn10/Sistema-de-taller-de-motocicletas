@@ -8,6 +8,8 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
 
 from apps.configuracion.models import HorarioTaller
 from apps.productos.models import Producto
@@ -15,7 +17,7 @@ from apps.servicios.models import Servicio
 from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
-from .models import Cita, CambioEstadoCita, RepuestoUsado, ServicioCita
+from .models import Cita, CambioEstadoCita, EstadoCita, RepuestoUsado, ServicioCita
 from .totales import calcular_detalle_cita, precio_valido
 from .ticket_pdf import generar_ticket_pdf
 from .services import (
@@ -35,13 +37,13 @@ def mis_citas(request):
         messages.error(request, 'Solo los clientes pueden ver sus citas.')
         return redirect('core:home')
 
-    hoy = date.today()
+    hoy = timezone.localdate()
     citas = Cita.objects.filter(
         cliente=request.user.cliente,
-    ).prefetch_related('servicios').order_by('-fecha', '-hora')
+    ).select_related('estado').prefetch_related('servicios').order_by('-fecha', '-hora')
 
-    activas = [c for c in citas if c.estado != Cita.ESTADO_CANCELADA]
-    canceladas = [c for c in citas if c.estado == Cita.ESTADO_CANCELADA]
+    activas = [c for c in citas if c.estado.tipo != EstadoCita.TIPO_CANCELADO]
+    canceladas = [c for c in citas if c.estado.tipo == EstadoCita.TIPO_CANCELADO]
 
     return render(request, 'citas/mis_citas.html', {
         'activas': activas,
@@ -64,7 +66,7 @@ def disponibilidad(request):
         'servicios': servicios,
         'fecha_str': fecha_str,
         'servicio_id': servicio_id,
-        'hoy': date.today().isoformat(),
+        'hoy': timezone.localdate().isoformat(),
     }
 
     if not fecha_str or not servicio_id:
@@ -76,7 +78,7 @@ def disponibilidad(request):
         contexto['error'] = 'Fecha inválida.'
         return render(request, 'citas/disponibilidad.html', contexto)
 
-    if fecha < date.today():
+    if fecha < timezone.localdate():
         contexto['error'] = 'No se pueden consultar fechas pasadas.'
         return render(request, 'citas/disponibilidad.html', contexto)
 
@@ -111,14 +113,19 @@ def disponibilidad(request):
     inicio = datetime.combine(fecha, horario.hora_apertura)
     fin = datetime.combine(fecha, horario.hora_cierre)
 
+    ahora = timezone.localtime()
     slots = []
     actual = inicio
     while actual + duracion <= fin:
         hora_slot = actual.time()
+        # si es hoy, solo se ofrecen los horarios que todavía no empezaron
+        if fecha == ahora.date() and hora_slot <= ahora.time():
+            actual += duracion
+            continue
         ocupados = Cita.objects.filter(
             fecha=fecha,
             hora=hora_slot,
-            estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA],
+            estado__tipo__in=[EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO],
         ).count()
         slots.append({
             'hora': hora_slot,
@@ -127,6 +134,9 @@ def disponibilidad(request):
             'libre': ocupados < capacidad,
         })
         actual += duracion
+
+    if not slots:
+        contexto['mensaje'] = 'Ya no hay horarios disponibles para hoy. Elegí otra fecha.'
 
     contexto.update({
         'fecha': fecha,
@@ -169,8 +179,13 @@ def agendar_cita(request):
         messages.error(request, 'Parámetros inválidos. Volvé a elegir un slot disponible.')
         return redirect('citas:disponibilidad')
 
-    if fecha < date.today():
+    if fecha < timezone.localdate():
         messages.error(request, 'No podés agendar en fechas pasadas.')
+        return redirect('citas:disponibilidad')
+
+    ahora = timezone.localtime()
+    if fecha == ahora.date() and hora <= ahora.time():
+        messages.error(request, 'Ese horario ya pasó. Elegí otro.')
         return redirect('citas:disponibilidad')
 
     servicios_adicionales = servicios_activos.exclude(id=servicio_principal.id)
@@ -191,7 +206,7 @@ def agendar_cita(request):
         ocupados = Cita.objects.filter(
             fecha=fecha,
             hora=hora,
-            estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA],
+            estado__tipo__in=[EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO],
         ).count()
         if ocupados >= capacidad:
             errores['slot'] = 'Este horario se acaba de llenar. Elegí otro.'
@@ -263,7 +278,7 @@ def cita_detalle(request, cita_id):
         'cita': cita,
         'servicios': servicios,
         'detalle_economico': (
-            calcular_detalle_cita(cita) if cita.estado == Cita.ESTADO_COMPLETADA else None
+            calcular_detalle_cita(cita) if cita.estado.tipo == EstadoCita.TIPO_COMPLETADO else None
         ),
     })
 
@@ -280,7 +295,7 @@ def descargar_ticket(request, cita_id):
         return redirect('core:home')
 
     cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
-    if cita.estado != Cita.ESTADO_COMPLETADA:
+    if cita.estado.tipo != EstadoCita.TIPO_COMPLETADO:
         messages.error(request, 'El ticket solo está disponible para citas completadas.')
         return redirect('citas:cita_detalle', cita_id=cita.id)
 
@@ -323,15 +338,21 @@ def reagendar_cita(request, cita_id):
             messages.error(request, 'Datos inválidos. Elegí un horario de la lista.')
             return redirect('citas:reagendar_cita', cita_id=cita.id)
 
-        if nueva_fecha < date.today():
+        if nueva_fecha < timezone.localdate():
             messages.error(request, 'No podés reagendar a una fecha pasada.')
             return redirect('citas:reagendar_cita', cita_id=cita.id)
+
+        ahora = timezone.localtime()
+        if nueva_fecha == ahora.date() and nueva_hora <= ahora.time():
+            messages.error(request, 'Ese horario ya pasó. Elegí otro.')
+            url = reverse('citas:reagendar_cita', args=[cita.id])
+            return redirect(f'{url}?fecha={nueva_fecha.isoformat()}')
 
         capacidad = Mecanico.objects.filter(activo=True).count()
         ocupados = Cita.objects.filter(
             fecha=nueva_fecha,
             hora=nueva_hora,
-            estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA],
+            estado__tipo__in=[EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO],
         ).exclude(id=cita.id).count()
         if ocupados >= capacidad:
             messages.error(request, 'Ese horario se acaba de llenar. Elegí otro.')
@@ -362,7 +383,7 @@ def reagendar_cita(request, cita_id):
     contexto = {
         'cita': cita,
         'servicio': servicio,
-        'hoy': date.today().isoformat(),
+        'hoy': timezone.localdate().isoformat(),
         'fecha_str': fecha_str,
     }
 
@@ -375,7 +396,7 @@ def reagendar_cita(request, cita_id):
         contexto['error'] = 'Fecha inválida.'
         return render(request, 'citas/reagendar_cita.html', contexto)
 
-    if fecha < date.today():
+    if fecha < timezone.localdate():
         contexto['error'] = 'No se pueden consultar fechas pasadas.'
         return render(request, 'citas/reagendar_cita.html', contexto)
 
@@ -395,20 +416,28 @@ def reagendar_cita(request, cita_id):
     inicio = datetime.combine(fecha, horario.hora_apertura)
     fin = datetime.combine(fecha, horario.hora_cierre)
 
+    ahora = timezone.localtime()
     slots = []
     actual = inicio
     while actual + duracion <= fin:
         hora_slot = actual.time()
+        # si es hoy, solo se ofrecen los horarios que todavía no empezaron
+        if fecha == ahora.date() and hora_slot <= ahora.time():
+            actual += duracion
+            continue
         ocupados = Cita.objects.filter(
             fecha=fecha,
             hora=hora_slot,
-            estado__in=[Cita.ESTADO_PENDIENTE, Cita.ESTADO_CONFIRMADA],
+            estado__tipo__in=[EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO],
         ).exclude(id=cita.id).count()
         slots.append({
             'hora': hora_slot,
             'libre': ocupados < capacidad,
         })
         actual += duracion
+
+    if not slots:
+        contexto['mensaje'] = 'Ya no hay horarios disponibles para hoy. Elegí otra fecha.'
 
     contexto.update({'fecha': fecha, 'slots': slots})
     return render(request, 'citas/reagendar_cita.html', contexto)
@@ -420,9 +449,10 @@ def cancelar_cita(request, cita_id):
         return redirect('core:home')
     cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
     if request.method == 'POST':
-        if cita.puede_cancelarse():
+        estado_cancelado = EstadoCita.objects.filter(tipo=EstadoCita.TIPO_CANCELADO).first()
+        if cita.puede_cancelarse() and estado_cancelado:
             with transaction.atomic():
-                cita.estado = Cita.ESTADO_CANCELADA
+                cita.estado = estado_cancelado
                 cita.save()
 
                 transaction.on_commit(
@@ -459,9 +489,9 @@ def calendario(request):
         try:
             fecha_base = datetime.strptime(fecha_str, '%Y-%m-%d').date()
         except ValueError:
-            fecha_base = date.today()
+            fecha_base = timezone.localdate()
     else:
-        fecha_base = date.today()
+        fecha_base = timezone.localdate()
 
     filtro_mecanico = request.GET.get('mecanico', '')
     filtro_estado = request.GET.get('estado', '')
@@ -469,21 +499,21 @@ def calendario(request):
     def consultar(desde, hasta):
         citas = Cita.objects.filter(
             fecha__gte=desde, fecha__lte=hasta,
-        ).select_related('cliente', 'motocicleta', 'mecanico').order_by('fecha', 'hora')
+        ).select_related('cliente', 'motocicleta', 'mecanico', 'estado').order_by('fecha', 'hora')
         if filtro_mecanico:
             citas = citas.filter(mecanico__dui=filtro_mecanico)
         if filtro_estado:
             citas = citas.filter(estado=filtro_estado)
         return citas
 
-    hoy = date.today()
+    hoy = timezone.localdate()
     nombres_dias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
     contexto = {
         'modo': modo,
         'fecha_base': fecha_base,
         'mecanicos': Mecanico.objects.filter(activo=True),
-        'estados': Cita.ESTADOS,
+        'estados': EstadoCita.objects.all(),
         'filtro_mecanico': filtro_mecanico,
         'filtro_estado': filtro_estado,
     }
@@ -557,23 +587,18 @@ def cita_admin_detalle(request, cita_id):
 
     cita = get_object_or_404(Cita, id=cita_id)
     servicios = cita.serviciocita_set.select_related('servicio').all()
-    cambios = cita.cambios_estado.select_related('realizado_por').all()
+    cambios = cita.cambios_estado.select_related('realizado_por', 'estado_anterior', 'estado_nuevo').all()
 
-    TRANSICIONES = {
-        Cita.ESTADO_PENDIENTE:  [Cita.ESTADO_CONFIRMADA, Cita.ESTADO_CANCELADA],
-        Cita.ESTADO_CONFIRMADA: [Cita.ESTADO_EN_PROCESO, Cita.ESTADO_CANCELADA],
-        Cita.ESTADO_EN_PROCESO: [Cita.ESTADO_COMPLETADA, Cita.ESTADO_CANCELADA],
-        Cita.ESTADO_COMPLETADA: [],
-        Cita.ESTADO_CANCELADA:  [],
-    }
-    estados_posibles = TRANSICIONES.get(cita.estado, [])
-    puede_asignar_mecanico = cita.estado not in [Cita.ESTADO_COMPLETADA, Cita.ESTADO_CANCELADA]
+    # el flujo lo define el tipo de cada estado (ver EstadoCita.siguientes_posibles)
+    estados_posibles = cita.estado.siguientes_posibles()
+    puede_asignar_mecanico = not cita.estado.es_final
 
-    # V2SCRUM-24: pasar a "Completada" exige registrar repuestos usados y
-    # observaciones de cierre, así que esa transición se maneja con su propio
-    # formulario ("finalizar_servicio") y se quita del selector genérico.
-    puede_finalizar = Cita.ESTADO_COMPLETADA in estados_posibles
-    opciones_estado_genericas = [c for c in estados_posibles if c != Cita.ESTADO_COMPLETADA]
+    # V2SCRUM-24: pasar a un estado de tipo completado exige registrar repuestos
+    # usados y observaciones de cierre, así que esa transición se maneja con su
+    # propio formulario ("finalizar_servicio") y se quita del selector genérico.
+    estado_completado = estados_posibles.filter(tipo=EstadoCita.TIPO_COMPLETADO).first()
+    puede_finalizar = estado_completado is not None
+    opciones_estado_genericas = estados_posibles.exclude(tipo=EstadoCita.TIPO_COMPLETADO)
     productos_disponibles = Producto.objects.filter(activo=True).order_by('nombre')
 
     if request.method == 'POST':
@@ -614,20 +639,28 @@ def cita_admin_detalle(request, cita_id):
             return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
         elif accion == 'cambiar_estado':
-            nuevo_estado = request.POST.get('nuevo_estado', '').strip()
+            codigo_nuevo = request.POST.get('nuevo_estado', '').strip()
             motivo = request.POST.get('motivo', '').strip()
 
-            if nuevo_estado == Cita.ESTADO_COMPLETADA:
-                messages.error(request, 'Para finalizar el servicio usá el formulario "Finalizar servicio".')
-                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
-
-            if nuevo_estado not in estados_posibles:
+            # solo se acepta un estado permitido por el flujo desde el actual
+            nuevo_estado = estados_posibles.filter(codigo=codigo_nuevo).first()
+            if nuevo_estado is None:
                 messages.error(request, 'Transición de estado no válida.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
-            if nuevo_estado == Cita.ESTADO_CANCELADA and not motivo:
+            if nuevo_estado.tipo == EstadoCita.TIPO_COMPLETADO:
+                messages.error(request, 'Para finalizar el servicio usá el formulario "Finalizar servicio".')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            if nuevo_estado.tipo == EstadoCita.TIPO_CANCELADO and not motivo:
                 messages.error(request, 'El motivo es obligatorio para cancelar.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            # el correo de confirmación se manda al salir del estado de Inicio hacia uno de Proceso
+            es_confirmacion = (
+                cita.estado.tipo == EstadoCita.TIPO_INICIO
+                and nuevo_estado.tipo == EstadoCita.TIPO_PROCESO
+            )
 
             with transaction.atomic():
                 CambioEstadoCita.objects.create(
@@ -640,19 +673,19 @@ def cita_admin_detalle(request, cita_id):
                 cita.estado = nuevo_estado
                 cita.save(update_fields=['estado'])
 
-                if nuevo_estado == Cita.ESTADO_CONFIRMADA:
+                if es_confirmacion:
                     transaction.on_commit(
                         lambda cita_id=cita.id: notificar_cita_confirmada(cita_id)
                     )
 
-            messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado}.')
+            messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado.nombre}.')
             return redirect('citas:calendario')
 
         elif accion == 'finalizar_servicio':
             """V2SCRUM-24: registra repuestos usados, observaciones de cierre,
             descuenta el inventario y pasa la cita a Completada."""
             if not puede_finalizar:
-                messages.error(request, 'Solo podés finalizar una cita que esté en proceso.')
+                messages.error(request, 'Esta cita no puede finalizarse desde su estado actual.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
 
             productos_ids = request.POST.getlist('producto_id')
@@ -729,11 +762,11 @@ def cita_admin_detalle(request, cita_id):
                 CambioEstadoCita.objects.create(
                     cita=cita,
                     estado_anterior=cita.estado,
-                    estado_nuevo=Cita.ESTADO_COMPLETADA,
+                    estado_nuevo=estado_completado,
                     motivo=observaciones_cierre,
                     realizado_por=request.user,
                 )
-                cita.estado = Cita.ESTADO_COMPLETADA
+                cita.estado = estado_completado
                 cita.observaciones_cierre = observaciones_cierre
                 cita.save(update_fields=['estado', 'observaciones_cierre'])
 
@@ -759,11 +792,10 @@ def cita_admin_detalle(request, cita_id):
         'servicios': servicios,
         'cambios': cambios,
         'estados_posibles': estados_posibles,
-        'estados_display': dict(Cita.ESTADOS),
         # Solo mecánicos libres en el horario de la cita (incluye al actual).
         'mecanicos': mecanicos_disponibles(cita) if puede_asignar_mecanico else [],
         'puede_asignar_mecanico': puede_asignar_mecanico,
-        'opciones_estado': [(c, dict(Cita.ESTADOS)[c]) for c in opciones_estado_genericas],
+        'opciones_estado': opciones_estado_genericas,
         'puede_finalizar': puede_finalizar,
         'productos_disponibles': productos_disponibles,
         'repuestos_usados': cita.repuestos_usados.select_related('producto').all(),
@@ -780,7 +812,7 @@ def mis_citas_mecanico(request):
     dia_str = request.GET.get('dia', '').strip()
     estado_filtro = request.GET.get('estado', '').strip()
 
-    citas = Cita.objects.select_related('cliente', 'motocicleta').prefetch_related('servicios')
+    citas = Cita.objects.select_related('cliente', 'motocicleta', 'estado').prefetch_related('servicios')
 
     dia = None
     if dia_str:
@@ -792,7 +824,7 @@ def mis_citas_mecanico(request):
     if dia:
         citas = citas.filter(fecha=dia)
     else:
-        hoy = date.today()
+        hoy = timezone.localdate()
         citas = citas.filter(fecha__gte=hoy, fecha__lte=hoy + timedelta(days=6))
 
     if estado_filtro:
@@ -804,5 +836,131 @@ def mis_citas_mecanico(request):
         'citas': citas,
         'dia_str': dia_str,
         'estado_filtro': estado_filtro,
-        'estados': Cita.ESTADOS,
+        'estados': EstadoCita.objects.all(),
+    })
+
+
+@login_required(login_url='usuarios:login')
+def estados_cita(request):
+    """Catálogo de estados de cita: listar, crear, editar y activar/desactivar."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    # de estos tipos el sistema necesita exactamente uno (agendar, finalizar y cancelar dependen de ellos)
+    TIPOS_UNICOS = [EstadoCita.TIPO_INICIO, EstadoCita.TIPO_COMPLETADO, EstadoCita.TIPO_CANCELADO]
+
+    estados = EstadoCita.objects.all()
+
+    estado_editar = None
+    editar_codigo = request.GET.get('editar')
+    if editar_codigo:
+        estado_editar = get_object_or_404(EstadoCita, codigo=editar_codigo)
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion')
+
+        if accion == 'guardar':
+            errores = {}
+            codigo_editar = request.POST.get('codigo', '').strip()
+            if codigo_editar:
+                estado_editar = get_object_or_404(EstadoCita, codigo=codigo_editar)
+
+            datos = {
+                'nombre': request.POST.get('nombre', '').strip(),
+                'tipo':   request.POST.get('tipo', '').strip(),
+            }
+
+            if not datos['nombre']:
+                errores['nombre'] = 'El nombre es obligatorio.'
+            elif len(datos['nombre']) > 50:
+                errores['nombre'] = 'El nombre no puede pasar de 50 caracteres.'
+            else:
+                repetido = EstadoCita.objects.filter(nombre__iexact=datos['nombre'])
+                if estado_editar:
+                    repetido = repetido.exclude(codigo=estado_editar.codigo)
+                if repetido.exists():
+                    errores['nombre'] = 'Ya existe un estado con ese nombre.'
+
+            if datos['tipo'] not in dict(EstadoCita.TIPOS):
+                errores['tipo'] = 'Elegí un tipo válido.'
+            elif estado_editar and estado_editar.tipo in TIPOS_UNICOS and datos['tipo'] != estado_editar.tipo:
+                errores['tipo'] = 'El tipo de este estado no se puede cambiar: el sistema necesita uno de este tipo.'
+            elif datos['tipo'] in TIPOS_UNICOS:
+                existente = EstadoCita.objects.filter(tipo=datos['tipo'])
+                if estado_editar:
+                    existente = existente.exclude(codigo=estado_editar.codigo)
+                if existente.exists():
+                    errores['tipo'] = (
+                        f'Ya existe un estado de tipo "{dict(EstadoCita.TIPOS)[datos["tipo"]]}" '
+                        f'({existente.first().nombre}). Solo puede haber uno.'
+                    )
+
+            if errores:
+                return render(request, 'citas/estados_cita.html', {
+                    'estados': estados,
+                    'tipos': EstadoCita.TIPOS,
+                    'tipos_unicos': TIPOS_UNICOS,
+                    'errores': errores,
+                    'datos': datos,
+                    'estado_editar': estado_editar,
+                    'mostrar_form': True,
+                })
+
+            if estado_editar:
+                estado_editar.nombre = datos['nombre']
+                estado_editar.tipo = datos['tipo']
+                estado_editar.save(update_fields=['nombre', 'tipo'])
+                messages.success(request, f'Estado "{estado_editar.nombre}" actualizado.')
+            else:
+                # el código se genera del nombre y no cambia nunca (es la PK)
+                base = slugify(datos['nombre']).replace('-', '_')[:25] or 'estado'
+                codigo = base
+                numero = 2
+                while EstadoCita.objects.filter(codigo=codigo).exists():
+                    codigo = f'{base}_{numero}'
+                    numero += 1
+
+                # el nuevo estado va al final de la lista y toma el color de su tipo
+                ultimo = EstadoCita.objects.order_by('-orden').first()
+                EstadoCita.objects.create(
+                    codigo=codigo,
+                    nombre=datos['nombre'],
+                    tipo=datos['tipo'],
+                    color=EstadoCita.COLORES[datos['tipo']],
+                    orden=ultimo.orden + 1 if ultimo else 1,
+                )
+                messages.success(request, f'Estado "{datos["nombre"]}" creado.')
+
+            return redirect('citas:estados_cita')
+
+        elif accion == 'desactivar':
+            estado = get_object_or_404(EstadoCita, codigo=request.POST.get('codigo'))
+            if estado.tipo in TIPOS_UNICOS:
+                messages.error(request, f'"{estado.nombre}" no se puede desactivar: el sistema necesita un estado de tipo {estado.get_tipo_display()}.')
+                return redirect('citas:estados_cita')
+            citas_en_estado = estado.citas.count()
+            if citas_en_estado:
+                messages.error(request, f'"{estado.nombre}" no se puede desactivar: tiene {citas_en_estado} cita(s) en ese estado.')
+                return redirect('citas:estados_cita')
+            estado.activo = False
+            estado.save(update_fields=['activo'])
+            messages.success(request, f'Estado "{estado.nombre}" desactivado.')
+            return redirect('citas:estados_cita')
+
+        elif accion == 'activar':
+            estado = get_object_or_404(EstadoCita, codigo=request.POST.get('codigo'))
+            estado.activo = True
+            estado.save(update_fields=['activo'])
+            messages.success(request, f'Estado "{estado.nombre}" activado.')
+            return redirect('citas:estados_cita')
+
+    return render(request, 'citas/estados_cita.html', {
+        'estados': estados,
+        'tipos': EstadoCita.TIPOS,
+        'tipos_unicos': TIPOS_UNICOS,
+        'errores': {},
+        'datos': {},
+        'estado_editar': estado_editar,
+        'mostrar_form': bool(request.GET.get('mostrar_form') or estado_editar),
     })

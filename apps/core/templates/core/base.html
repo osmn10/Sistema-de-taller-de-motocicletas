@@ -50,11 +50,13 @@
         <nav class="sidebar-nav">
             {% if user.is_admin %}
                 <a class="side-link {% if un == 'admin_panel' %}active{% endif %}" href="{% url 'core:admin_panel' %}">{% include 'core/_icon.html' with name='inicio' %}<span>Inicio</span></a>
-                <a class="side-link {% if ns == 'citas' and un != 'disponibilidad' %}active{% endif %}" href="{% url 'citas:calendario' %}">{% include 'core/_icon.html' with name='citas' %}<span>Citas</span></a>
+                <a class="side-link {% if ns == 'citas' and un != 'disponibilidad' and un != 'estados_cita' %}active{% endif %}" href="{% url 'citas:calendario' %}">{% include 'core/_icon.html' with name='citas' %}<span>Citas</span></a>
+                <a class="side-link {% if un == 'estados_cita' %}active{% endif %}" href="{% url 'citas:estados_cita' %}">{% include 'core/_icon.html' with name='estados' %}<span>Estados de cita</span></a>
                 <a class="side-link {% if un == 'disponibilidad' %}active{% endif %}" href="{% url 'citas:disponibilidad' %}">{% include 'core/_icon.html' with name='disponibilidad' %}<span>Disponibilidad</span></a>
                 <a class="side-link {% if un == 'clientes_lista' or un == 'cliente_detalle' or un == 'cliente_editar' %}active{% endif %}" href="{% url 'usuarios:clientes_lista' %}">{% include 'core/_icon.html' with name='clientes' %}<span>Clientes</span></a>
                 <a class="side-link {% if ns == 'servicios' %}active{% endif %}" href="{% url 'servicios:catalogo_servicios' %}">{% include 'core/_icon.html' with name='servicios' %}<span>Servicios</span></a>
-                <a class="side-link {% if ns == 'productos' %}active{% endif %}" href="{% url 'productos:inventario' %}">{% include 'core/_icon.html' with name='productos' %}<span>Productos</span></a>
+                <a class="side-link {% if ns == 'productos' and un != 'proveedores' %}active{% endif %}" href="{% url 'productos:inventario' %}">{% include 'core/_icon.html' with name='productos' %}<span>Productos</span></a>
+                <a class="side-link {% if un == 'proveedores' %}active{% endif %}" href="{% url 'productos:proveedores' %}">{% include 'core/_icon.html' with name='proveedores' %}<span>Proveedores</span></a>
                 <a class="side-link {% if un == 'usuarios_lista' or un == 'usuario_crear' or un == 'usuario_editar' %}active{% endif %}" href="{% url 'usuarios:usuarios_lista' %}">{% include 'core/_icon.html' with name='usuarios' %}<span>Usuarios</span></a>
                 <a class="side-link {% if ns == 'configuracion' %}active{% endif %}" href="{% url 'configuracion:horario' %}">{% include 'core/_icon.html' with name='horario' %}<span>Horario</span></a>
             {% elif user.is_mecanico %}

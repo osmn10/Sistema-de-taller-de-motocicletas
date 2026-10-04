@@ -6,10 +6,10 @@ from django.db import models
 from apps.usuarios.models import Cliente
 
 
-# validador del formato salvadoreño de placa de moto: M-####
+# validador del formato de placa de moto: una letra, guión y 4 dígitos (L-####)
 placa_validator = RegexValidator(
-    regex=r'^M-\d{4}$',
-    message='Formato de placa inválido. Debe ser M-#### (ej. M-1234).',
+    regex=r'^[A-Z]-\d{4}$',
+    message='Formato de placa inválido. Debe ser una letra, guión y 4 dígitos (ej. M-1234).',
 )
 
 
@@ -20,7 +20,7 @@ class Motocicleta(models.Model):
         primary_key=True,  # PK natural — no necesitamos un id autoincremental
         max_length=6,
         validators=[placa_validator],
-        help_text='Formato: M-####',
+        help_text='Formato: L-#### (una letra y 4 dígitos)',
     )
     cliente = models.ForeignKey(
         Cliente,
