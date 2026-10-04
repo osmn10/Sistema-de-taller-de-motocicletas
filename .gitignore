@@ -19,3 +19,6 @@ staticfiles/
 
 # Editores / IDEs
 .vscode/
+
+# Estado local de OMC, herramienta de orquestacion (no se sube)
+.omc/

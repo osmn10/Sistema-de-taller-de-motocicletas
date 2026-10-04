@@ -1,0 +1,112 @@
+{% extends "core/base.html" %}
+
+{% block title %}Estados de cita — Taller de Motos{% endblock %}
+
+{% block content %}
+<p class="eyebrow mb-1">GESTIÓN DE ESTADOS DE CITA · ADMIN</p>
+<h2 class="mb-4">Estados de cita</h2>
+
+<div class="mb-4">
+    <a href="?mostrar_form=1" class="btn btn-dark">+ Nuevo estado</a>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th class="text-muted fw-normal small">ESTADO</th>
+            <th class="text-muted fw-normal small">TIPO</th>
+            <th class="text-muted fw-normal small">ACTIVO</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for estado in estados %}
+        <tr>
+            <td class="align-middle">
+                <span class="badge rounded-pill status-badge status-{{ estado.tipo }} px-3 py-2"
+                      style="--sb: {{ estado.color }}; --sb-rgb: {{ estado.color_rgb }};">{{ estado.nombre }}</span>
+            </td>
+            <td class="align-middle small">{{ estado.get_tipo_display }}</td>
+            <td class="align-middle">
+                <span class="badge rounded-pill status-badge {% if estado.activo %}status-on{% else %}status-off{% endif %} px-3 py-2">
+                    {% if estado.activo %}Activo{% else %}Inactivo{% endif %}
+                </span>
+            </td>
+            <td class="align-middle text-end">
+                <a href="?editar={{ estado.codigo }}" class="btn btn-sm btn-outline-dark me-1">Editar</a>
+                {% if estado.tipo not in tipos_unicos %}
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="codigo" value="{{ estado.codigo }}">
+                    {% if estado.activo %}
+                        <input type="hidden" name="accion" value="desactivar">
+                        <button type="submit" class="btn btn-sm btn-outline-dark">Desactivar</button>
+                    {% else %}
+                        <input type="hidden" name="accion" value="activar">
+                        <button type="submit" class="btn btn-sm btn-outline-dark">Activar</button>
+                    {% endif %}
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" class="text-center text-muted py-4">No hay estados registrados.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if mostrar_form %}
+<hr class="my-4">
+<p class="eyebrow mb-3">
+    {% if estado_editar %}EDITAR ESTADO{% else %}NUEVO ESTADO{% endif %}
+</p>
+<form method="post" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="accion" value="guardar">
+    {% if estado_editar %}
+        <input type="hidden" name="codigo" value="{{ estado_editar.codigo }}">
+    {% endif %}
+
+    <div class="row mb-3 align-items-start">
+        <label for="nombre" class="col-sm-2 col-form-label">Nombre</label>
+        <div class="col-sm-10">
+            <input type="text" id="nombre" name="nombre" maxlength="50"
+                   class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+                   placeholder="Ej. En cambio de aceite"
+                   value="{% if datos %}{{ datos.nombre }}{% elif estado_editar %}{{ estado_editar.nombre }}{% endif %}">
+            {% if errores.nombre %}<div class="invalid-feedback">{{ errores.nombre }}</div>{% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3 align-items-start">
+        <label for="tipo" class="col-sm-2 col-form-label">Tipo</label>
+        <div class="col-sm-10">
+            {% if estado_editar and estado_editar.tipo in tipos_unicos %}
+                <input type="hidden" name="tipo" value="{{ estado_editar.tipo }}">
+                <select id="tipo" class="form-select" disabled>
+                    <option>{{ estado_editar.get_tipo_display }}</option>
+                </select>
+                <div class="form-text">El tipo de este estado no se puede cambiar: el sistema necesita uno de este tipo.</div>
+            {% else %}
+                <select id="tipo" name="tipo" class="form-select {% if errores.tipo %}is-invalid{% endif %}">
+                    {% for valor, etiqueta in tipos %}
+                    <option value="{{ valor }}"
+                        {% if datos %}{% if datos.tipo == valor %}selected{% endif %}{% elif estado_editar %}{% if estado_editar.tipo == valor %}selected{% endif %}{% elif valor == 'proceso' %}selected{% endif %}>{{ etiqueta }}</option>
+                    {% endfor %}
+                </select>
+                <div class="form-text">Los estados nuevos normalmente son de tipo Proceso (ej. En reparación, Preparando para entrega).</div>
+                {% if errores.tipo %}<div class="invalid-feedback">{{ errores.tipo }}</div>{% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'citas:estados_cita' %}" class="btn btn-outline-dark">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Guardar estado</button>
+    </div>
+</form>
+{% endif %}
+
+{% endblock %}

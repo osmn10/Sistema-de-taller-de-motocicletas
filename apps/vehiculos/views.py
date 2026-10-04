@@ -37,7 +37,7 @@ def moto_crear(request):
     if request.method == 'POST':
         errores = {}
         datos = {
-            # placa SIEMPRE en mayúsculas para que coincida con el regex M-####
+            # placa SIEMPRE en mayúsculas para que coincida con el regex L-####
             'placa':       request.POST.get('placa', '').strip().upper(),
             'marca':       request.POST.get('marca', '').strip(),
             'modelo':      request.POST.get('modelo', '').strip(),
@@ -50,7 +50,7 @@ def moto_crear(request):
         try:
             placa_validator(datos['placa'])
         except Exception:
-            errores['placa'] = 'Formato inválido. Debe ser M-#### (ej. M-1234).'
+            errores['placa'] = 'Formato inválido. Debe ser una letra, guión y 4 dígitos (ej. M-1234).'
         # placa es PK → no puede repetirse a nivel global del sistema
         if datos['placa'] and Motocicleta.objects.filter(placa=datos['placa']).exists():
             errores['placa'] = 'Ya existe una moto con esa placa.'
@@ -205,7 +205,7 @@ def moto_toggle(request, placa):
 @login_required(login_url='usuarios:login')
 def historial_moto(request, placa):
     """SCRUM-28. Historial de servicios completados de una motocicleta."""
-    from apps.citas.models import Cita
+    from apps.citas.models import Cita, EstadoCita
 
     if request.user.is_cliente:
         moto = get_object_or_404(Motocicleta, placa=placa, cliente=request.user.cliente)
@@ -218,8 +218,8 @@ def historial_moto(request, placa):
     citas = Cita.objects.filter(
         motocicleta=moto,
     ).exclude(
-        estado=Cita.ESTADO_CANCELADA
-    ).prefetch_related('serviciocita_set__servicio').order_by('-fecha', '-hora')
+        estado__tipo=EstadoCita.TIPO_CANCELADO
+    ).select_related('estado').prefetch_related('serviciocita_set__servicio').order_by('-fecha', '-hora')
 
     return render(request, 'vehiculos/historial_moto.html', {
         'moto': moto,
