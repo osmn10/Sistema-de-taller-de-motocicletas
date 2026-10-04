@@ -12,11 +12,12 @@ from .base import *  # noqa: F401,F403
 
 DEBUG = False
 
-# En producción SMTP es el valor por defecto, salvo override del entorno. La clave se
-# configura en el panel del hosting mediante EMAIL_HOST_PASSWORD.
+# En producción el correo sale por la API HTTPS de Brevo (Render bloquea SMTP en el
+# plan gratuito). En Render, EMAIL_BACKEND debe quedar en el backend de Brevo y la
+# clave va en BREVO_API_KEY.
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
-    default='django.core.mail.backends.smtp.EmailBackend',
+    default='anymail.backends.brevo.EmailBackend',
 )
 
 

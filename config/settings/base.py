@@ -35,6 +35,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     'django_bootstrap5',
+    'anymail',
 ]
 
 LOCAL_APPS = [
@@ -140,7 +141,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Correo electrónico
 # ---------------------------------------------------------------------------
 # En desarrollo se usa la consola por defecto. Para realizar envíos reales,
-# EMAIL_BACKEND debe configurarse con el backend SMTP desde el archivo .env.
+# EMAIL_BACKEND debe configurarse desde el archivo .env: SMTP o Brevo (anymail).
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
     default='django.core.mail.backends.console.EmailBackend',
@@ -153,8 +154,9 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
 DEFAULT_FROM_EMAIL = config(
     'DEFAULT_FROM_EMAIL',
-    default='Sistema del Taller <onboarding@resend.dev>',
+    default='Sistema del Taller <proyectodsi2026@gmail.com>',
 )
+ANYMAIL = {'BREVO_API_KEY': config('BREVO_API_KEY', default='')}
 TALLER_NOMBRE = config('TALLER_NOMBRE', default='Sistema del Taller')
 TALLER_TELEFONO = config('TALLER_TELEFONO', default='')
 TALLER_DIRECCION = config('TALLER_DIRECCION', default='')
