@@ -18,7 +18,7 @@
         <div class="stat-value">{{ citas_hoy }}</div>
         <p class="stat-hint">Asignadas a vos para hoy</p>
     </a>
-    <a href="{% url 'citas:mis_citas_mecanico' %}?estado=en_proceso" class="stat-card stat-amber">
+    <a href="{% url 'citas:mis_citas_mecanico' %}" class="stat-card stat-amber">
         <span class="stat-label">{% include 'core/_icon.html' with name='servicios' %}en proceso</span>
         <div class="stat-value">{{ citas_en_proceso }}</div>
         <p class="stat-hint">Servicios que estás trabajando</p>
@@ -59,7 +59,7 @@
                     <td>{{ cita.cliente.nombre_completo }}</td>
                     <td>{{ cita.motocicleta }}</td>
                     <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
-                    <td><span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span></td>
+                    <td><span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span></td>
                 </tr>
                 {% endfor %}
             </tbody>

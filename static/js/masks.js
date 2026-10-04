@@ -30,8 +30,15 @@
     }
 
     function aplicarMascaraPlaca(input) {
-        let digitos = input.value.replace(/\D/g, '').slice(0, 4);
-        input.value = digitos ? 'M-' + digitos : '';
+        const valor = input.value.toUpperCase();
+        const letra = (valor.match(/[A-Z]/) || [''])[0];
+        if (!letra) {
+            input.value = '';
+            return;
+        }
+        const resto = valor.slice(valor.indexOf(letra) + 1);
+        const digitos = resto.replace(/\D/g, '').slice(0, 4);
+        input.value = digitos ? letra + '-' + digitos : letra;
     }
 
     function manejarInput(event) {

@@ -35,8 +35,8 @@
             </td>
             <td>{{ moto.placa }} · {{ moto.marca }} {{ moto.modelo }}</td>
             <td>
-                <span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">
-                    {{ cita.get_estado_display }}
+                <span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">
+                    {{ cita.estado.nombre }}
                 </span>
             </td>
         </tr>

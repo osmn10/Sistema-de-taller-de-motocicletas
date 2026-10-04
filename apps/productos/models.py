@@ -1,29 +1,13 @@
 """Modelos de la app productos."""
 
-from django.core.validators import RegexValidator
 from django.db import models
-
-
-# Validador para el formato de NIT: ####-######-###-#
-nit_validator = RegexValidator(
-    regex=r'^\d{4}-\d{6}-\d{3}-\d$',
-    message='Formato de NIT inválido. Debe ser ####-######-###-#.',
-)
 
 
 class Proveedor(models.Model):
     """Proveedor de productos y repuestos del taller."""
 
-    # NIT como llave primaria con formato ####-######-###-#
-    nit = models.CharField(
-        primary_key=True,
-        max_length=17,
-        validators=[nit_validator],
-        verbose_name='NIT',
-        help_text='Formato: ####-######-###-#',
-    )
     # Nombre o razón social del proveedor
-    nombre = models.CharField(max_length=200, verbose_name='Razón social')
+    nombre = models.CharField(max_length=200)
     # Teléfono de contacto del proveedor
     telefono = models.CharField(max_length=9, blank=True)
     # Correo electrónico del proveedor

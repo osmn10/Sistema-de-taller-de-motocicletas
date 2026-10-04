@@ -42,7 +42,7 @@
                 <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
                 <td>{{ cita.motocicleta }}</td>
                 <td>
-                    <span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span>
+                    <span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span>
                 </td>
                 <td class="text-end">
                     <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>
@@ -85,7 +85,7 @@
                 <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
                 <td>{{ cita.motocicleta }}</td>
                 <td>
-                    <span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span>
+                    <span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span>
                 </td>
                 <td class="text-end">
                     <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>

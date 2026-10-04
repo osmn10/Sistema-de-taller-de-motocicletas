@@ -33,7 +33,7 @@ class TotalesCitaTests(TestCase):
     def setUp(self):
         self.cita = Cita.objects.create(
             cliente=self.cliente, motocicleta=self.moto, fecha=date.today(), hora=time(9),
-            estado=Cita.ESTADO_EN_PROCESO,
+            estado_id='en_proceso',
         )
         ServicioCita.objects.create(cita=self.cita, servicio=self.servicio, precio_final='15.00')
         self.producto = Producto.objects.create(nombre='Filtro', precio='4.25', stock_actual=10)
@@ -127,7 +127,7 @@ class TotalesCitaTests(TestCase):
         self.cerrar()
         self.cita.refresh_from_db()
         self.producto.refresh_from_db()
-        self.assertEqual(self.cita.estado, Cita.ESTADO_EN_PROCESO)
+        self.assertEqual(self.cita.estado_id, 'en_proceso')
         self.assertEqual(self.producto.stock_actual, 10)
         self.assertFalse(self.cita.repuestos_usados.exists())
 
@@ -135,13 +135,13 @@ class TotalesCitaTests(TestCase):
         self.cita.serviciocita_set.update(precio_final='-1.00')
         self.cerrar()
         self.cita.refresh_from_db()
-        self.assertEqual(self.cita.estado, Cita.ESTADO_EN_PROCESO)
+        self.assertEqual(self.cita.estado_id, 'en_proceso')
         self.assertIsNone(calcular_detalle_cita(self.cita)['total'])
 
     def test_filas_incompletas_no_se_descartan_silenciosamente(self):
         self.cerrar(producto_id=[str(self.producto.id)], cantidad=[])
         self.cita.refresh_from_db()
-        self.assertEqual(self.cita.estado, Cita.ESTADO_EN_PROCESO)
+        self.assertEqual(self.cita.estado_id, 'en_proceso')
         self.assertFalse(self.cita.repuestos_usados.exists())
 
     def test_validacion_de_precio(self):
@@ -183,7 +183,7 @@ class TotalesCitaTests(TestCase):
 
     def test_cliente_ve_advertencia_en_cita_sin_precio_historico(self):
         RepuestoUsado.objects.create(cita=self.cita, producto=self.producto, cantidad=2)
-        self.cita.estado = Cita.ESTADO_COMPLETADA
+        self.cita.estado_id = 'completada'
         self.cita.save(update_fields=['estado'])
         respuesta = self.ver_detalle_cliente()
         self.assertContains(respuesta, 'Total referencial')

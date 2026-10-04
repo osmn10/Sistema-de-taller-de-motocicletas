@@ -29,9 +29,10 @@
                 <input type="text" id="placa" name="placa"
                        class="form-control {% if errores.placa %}is-invalid{% endif %}"
                        value="{{ datos.placa }}"
-                       placeholder="M-####"
+                       placeholder="Ej. M-1234"
                        maxlength="6"
                        data-mask="placa">
+                <div class="form-text">Una letra seguida de 4 números. El guión se agrega automáticamente.</div>
                 {% if errores.placa %}
                     <div class="invalid-feedback">{{ errores.placa }}</div>
                 {% endif %}
