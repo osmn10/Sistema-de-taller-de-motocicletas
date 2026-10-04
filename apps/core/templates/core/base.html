@@ -51,6 +51,7 @@
             {% if user.is_admin %}
                 <a class="side-link {% if un == 'admin_panel' %}active{% endif %}" href="{% url 'core:admin_panel' %}">{% include 'core/_icon.html' with name='inicio' %}<span>Inicio</span></a>
                 <a class="side-link {% if ns == 'citas' and un != 'disponibilidad' %}active{% endif %}" href="{% url 'citas:calendario' %}">{% include 'core/_icon.html' with name='citas' %}<span>Citas</span></a>
+                <a class="side-link {% if un == 'reporte_servicios' %}active{% endif %}" href="{% url 'citas:reporte_servicios' %}">{% include 'core/_icon.html' with name='servicios' %}<span>Reporte</span></a>
                 <a class="side-link {% if un == 'disponibilidad' %}active{% endif %}" href="{% url 'citas:disponibilidad' %}">{% include 'core/_icon.html' with name='disponibilidad' %}<span>Disponibilidad</span></a>
                 <a class="side-link {% if un == 'clientes_lista' or un == 'cliente_detalle' or un == 'cliente_editar' %}active{% endif %}" href="{% url 'usuarios:clientes_lista' %}">{% include 'core/_icon.html' with name='clientes' %}<span>Clientes</span></a>
                 <a class="side-link {% if ns == 'servicios' %}active{% endif %}" href="{% url 'servicios:catalogo_servicios' %}">{% include 'core/_icon.html' with name='servicios' %}<span>Servicios</span></a>

@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from apps.configuracion.models import HorarioTaller
+from apps.core.utils import rango_fechas
 from apps.productos.models import Producto
 from apps.servicios.models import Servicio
 from apps.usuarios.models import Mecanico
@@ -17,6 +18,9 @@ from apps.vehiculos.models import Motocicleta
 
 from .models import Cita, CambioEstadoCita, RepuestoUsado, ServicioCita
 from .totales import calcular_detalle_cita, precio_valido
+from .reportes import calcular_reporte_servicios
+from .reporte_excel import generar_reporte_excel
+from .reporte_pdf import generar_reporte_pdf
 from .ticket_pdf import generar_ticket_pdf
 from .services import (
     notificar_cita_agendada,
@@ -797,4 +801,46 @@ def mis_citas_mecanico(request):
         'dia_str': dia_str,
         'estado_filtro': estado_filtro,
         'estados': Cita.ESTADOS,
+    })
+
+
+@login_required(login_url='usuarios:login')
+def reporte_servicios(request):
+    """V2SCRUM-39. Reporte de servicios del taller por período, con filtros
+    de servicio/mecánico y export a PDF o Excel.
+    """
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    desde, hasta = rango_fechas(request)
+    servicio_id = request.GET.get('servicio') or None
+    mecanico_dui = request.GET.get('mecanico') or None
+
+    datos = calcular_reporte_servicios(desde, hasta, servicio_id, mecanico_dui)
+
+    exportar = request.GET.get('export')
+    if exportar == 'pdf':
+        pdf_bytes = generar_reporte_pdf(desde, hasta, datos)
+        respuesta = HttpResponse(pdf_bytes, content_type='application/pdf')
+        respuesta['Content-Disposition'] = f'attachment; filename="reporte_servicios_{desde}_{hasta}.pdf"'
+        return respuesta
+
+    if exportar == 'xlsx':
+        xlsx_bytes = generar_reporte_excel(desde, hasta, datos)
+        respuesta = HttpResponse(
+            xlsx_bytes,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        respuesta['Content-Disposition'] = f'attachment; filename="reporte_servicios_{desde}_{hasta}.xlsx"'
+        return respuesta
+
+    return render(request, 'citas/reporte_servicios.html', {
+        'desde': desde,
+        'hasta': hasta,
+        'servicio_id': servicio_id,
+        'mecanico_dui': mecanico_dui,
+        'servicios': Servicio.objects.filter(activo=True).order_by('nombre'),
+        'mecanicos': Mecanico.objects.order_by('apellido', 'nombre'),
+        **datos,
     })

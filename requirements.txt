@@ -25,5 +25,8 @@ whitenoise>=6.7
 # Generación de PDF (ticket de servicio, V2SCRUM-30)
 reportlab>=4.0
 
+# Generación de Excel (export del reporte de servicios, V2SCRUM-39)
+openpyxl>=3.1
+
 # Envío de correo por API HTTPS de Brevo (Render bloquea SMTP en plan gratuito)
 django-anymail[brevo]>=15.2

@@ -1,0 +1,120 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Reporte de servicios · Taller{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Reporte de servicios</h1>
+
+<form method="get" class="row row-cols-auto g-2 align-items-end mb-2">
+    <div class="col">
+        <label for="desde" class="form-label text-muted small mb-1">Desde</label>
+        <input type="date" id="desde" name="desde" value="{{ desde|date:'Y-m-d' }}"
+               class="form-control form-control-sm">
+    </div>
+    <div class="col">
+        <label for="hasta" class="form-label text-muted small mb-1">Hasta</label>
+        <input type="date" id="hasta" name="hasta" value="{{ hasta|date:'Y-m-d' }}"
+               class="form-control form-control-sm">
+    </div>
+    <div class="col">
+        <label for="servicio" class="form-label text-muted small mb-1">Servicio</label>
+        <select id="servicio" name="servicio" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for s in servicios %}
+                <option value="{{ s.id }}" {% if servicio_id == s.id|stringformat:'s' %}selected{% endif %}>
+                    {{ s.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col">
+        <label for="mecanico" class="form-label text-muted small mb-1">Mecánico</label>
+        <select id="mecanico" name="mecanico" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for m in mecanicos %}
+                <option value="{{ m.dui }}" {% if mecanico_dui == m.dui %}selected{% endif %}>
+                    {{ m.nombre }} {{ m.apellido }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col">
+        <button type="submit" class="btn btn-dark btn-sm">Aplicar</button>
+    </div>
+    <div class="col ms-auto d-flex gap-2">
+        <button type="submit" name="export" value="pdf" class="btn btn-outline-dark btn-sm">
+            Descargar PDF
+        </button>
+        <button type="submit" name="export" value="xlsx" class="btn btn-outline-dark btn-sm">
+            Descargar Excel
+        </button>
+    </div>
+</form>
+
+<p class="text-muted small mb-4">Período: {{ desde|date:'d/m/Y' }} — {{ hasta|date:'d/m/Y' }}</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Citas del período</p>
+            <p class="h2 mb-0">{{ total_citas }}</p>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Servicios completados</p>
+            <p class="h2 mb-0">{{ servicios_completados }}</p>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Ingresos totales</p>
+            <p class="h2 mb-0">$&nbsp;{{ ingresos_totales|floatformat:2 }}</p>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card h-100"><div class="card-body">
+            <h5 class="card-title">Servicios más solicitados</h5>
+            {% if servicios_top %}
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Servicio</th><th class="text-end">Cantidad</th></tr></thead>
+                <tbody>
+                {% for fila in servicios_top %}
+                    <tr>
+                        <td>{{ fila.servicio__nombre }}</td>
+                        <td class="text-end">{{ fila.cantidad }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted mb-0">Sin datos en el período.</p>
+            {% endif %}
+        </div></div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100"><div class="card-body">
+            <h5 class="card-title">Mecánico con más servicios</h5>
+            {% if mecanicos_top %}
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Mecánico</th><th class="text-end">Cantidad</th></tr></thead>
+                <tbody>
+                {% for fila in mecanicos_top %}
+                    <tr>
+                        <td>{{ fila.mecanico__nombre }} {{ fila.mecanico__apellido }}</td>
+                        <td class="text-end">{{ fila.cantidad }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted mb-0">Sin datos en el período.</p>
+            {% endif %}
+        </div></div>
+    </div>
+</div>
+{% endblock %}
