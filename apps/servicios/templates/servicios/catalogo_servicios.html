@@ -2,22 +2,15 @@
 
 {% block title %}Catálogo de servicios — Taller de Motos{% endblock %}
 
-{% block extra_css %}
-<style>
-    .form-control { border-style: dashed; }
-    .form-control.is-invalid { border-style: dashed; }
-</style>
-{% endblock %}
-
 {% block content %}
-<p class="text-muted small mb-1">12 · GESTIÓN DEL CATÁLOGO DE SERVICIOS · ADMIN</p>
+<p class="eyebrow mb-1">12 · GESTIÓN DEL CATÁLOGO DE SERVICIOS · ADMIN</p>
 <h2 class="mb-4">Catálogo de servicios</h2>
 
 <div class="d-flex align-items-center gap-3 mb-4">
     <a href="?mostrar_form=1" class="btn btn-dark">+ Nuevo servicio</a>
     <form method="get" class="d-flex gap-2">
         <input type="text" name="q" class="form-control" placeholder="Buscar por nombre"
-               value="{{ busqueda }}" style="width: 220px; border-style: solid;">
+               value="{{ busqueda }}" style="width: 220px;">
         <button type="submit" class="btn btn-outline-dark">Buscar</button>
         {% if busqueda %}
             <a href="{% url 'servicios:catalogo' %}" class="btn btn-outline-dark">x</a>
@@ -42,7 +35,7 @@
             <td class="align-middle">${{ servicio.precio_base }}</td>
             <td class="align-middle">{{ servicio.duracion_display }}</td>
             <td class="align-middle">
-                <span class="badge rounded-pill border text-dark bg-white px-3 py-2">
+                <span class="badge rounded-pill status-badge {% if servicio.activo %}status-on{% else %}status-off{% endif %} px-3 py-2">
                     {% if servicio.activo %}Activo{% else %}Inactivo{% endif %}
                 </span>
             </td>
@@ -71,7 +64,7 @@
 
 {% if request.GET.mostrar_form or servicio_editar %}
 <hr class="my-4">
-<p class="text-muted small mb-3">
+<p class="eyebrow mb-3">
     {% if servicio_editar %}EDITAR SERVICIO{% else %}NUEVO SERVICIO (FORMULARIO){% endif %}
 </p>
 <form method="post">

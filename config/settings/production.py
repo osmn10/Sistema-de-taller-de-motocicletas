@@ -13,7 +13,7 @@ from .base import *  # noqa: F401,F403
 DEBUG = False
 
 # En producción SMTP es el valor por defecto, salvo override del entorno. La clave se
-# configura en el panel del hosting mediante RESEND_API_KEY.
+# configura en el panel del hosting mediante EMAIL_HOST_PASSWORD.
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
     default='django.core.mail.backends.smtp.EmailBackend',
@@ -21,7 +21,7 @@ EMAIL_BACKEND = config(
 
 
 # ---------------------------------------------------------------------------
-# Base de datos: PostgreSQL vía DATABASE_URL
+# Base de datos: PostgreSQL vía DATABASE_URL (Neon.tech)
 # ---------------------------------------------------------------------------
 DATABASES = {
     'default': dj_database_url.config(
@@ -29,6 +29,21 @@ DATABASES = {
         conn_max_age=600,
         ssl_require=True,
     )
+}
+
+
+# ---------------------------------------------------------------------------
+# Archivos estáticos: WhiteNoise (sin servidor web aparte)
+# ---------------------------------------------------------------------------
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    *MIDDLEWARE[1:],
+]
+
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
 
 

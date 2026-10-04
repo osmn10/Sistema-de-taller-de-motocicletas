@@ -11,6 +11,9 @@ venv/
 # Base de datos local
 db.sqlite3
 
+# Estáticos recolectados (WhiteNoise/collectstatic)
+staticfiles/
+
 # Sistema operativo
 .DS_Store
 

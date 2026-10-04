@@ -8,7 +8,7 @@
 {% block content %}
 
 <!-- Subtítulo y título de la sección -->
-<p class="text-muted small mb-1">MIS CITAS</p>
+<p class="eyebrow mb-1">MIS CITAS</p>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">Mis citas</h2>
     <a href="{% url 'citas:disponibilidad' %}" class="btn btn-outline-dark">Ver disponibilidad</a>
@@ -42,7 +42,7 @@
                 <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
                 <td>{{ cita.motocicleta }}</td>
                 <td>
-                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                    <span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span>
                 </td>
                 <td class="text-end">
                     <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>
@@ -85,7 +85,7 @@
                 <td>{% for s in cita.servicios.all %}{{ s.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
                 <td>{{ cita.motocicleta }}</td>
                 <td>
-                    <span class="badge rounded-pill border text-dark bg-white px-3 py-2">{{ cita.get_estado_display }}</span>
+                    <span class="badge rounded-pill status-badge status-{{ cita.estado }} px-3 py-2">{{ cita.get_estado_display }}</span>
                 </td>
                 <td class="text-end">
                     <a href="{% url 'citas:cita_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>

@@ -3,15 +3,40 @@
 {% block title %}Inicio · Taller de Motos{% endblock %}
 
 {% block content %}
-<div class="text-center py-5">
-    <h1 class="display-5 fw-light">Sistema de Taller de Motocicletas</h1>
-    <p class="lead text-muted">Agendá citas, registrá tus motos y llevá el historial de servicios.</p>
+<section class="hero">
+    <p class="eyebrow">sistema de control de servicios y citas</p>
+    <h1>Sistema de Taller<br>de Motocicletas</h1>
+    <p class="lead">Agendá citas, registrá tus motos y llevá el historial de servicios desde cualquier lugar.</p>
 
     {% if not user.is_authenticated %}
-        <div class="mt-4">
-            <a href="{% url 'usuarios:login' %}" class="btn btn-dark me-2">Iniciar sesión</a>
-            <a href="{% url 'usuarios:registro_cliente' %}" class="btn btn-outline-dark">Crear cuenta</a>
-        </div>
+    <div class="d-flex justify-content-center gap-2 flex-wrap">
+        <a href="{% url 'usuarios:login' %}" class="btn btn-dark btn-lg px-4">Iniciar sesión</a>
+        <a href="{% url 'usuarios:registro_cliente' %}" class="btn btn-outline-dark btn-lg px-4">Crear cuenta</a>
+    </div>
     {% endif %}
-</div>
+
+    <div class="feature-grid">
+        <div class="feature">
+            <div class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M8 15h3"/></svg>
+            </div>
+            <h3>Citas en línea</h3>
+            <p>Consultá disponibilidad real y reservá el horario que te convenga.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17h6l3-7h4M9 10h4l-2-4h3"/></svg>
+            </div>
+            <h3>Tus motocicletas</h3>
+            <p>Registrá cada moto por placa y mantené su kilometraje al día.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="6"/><path d="M12 9v3l2 1"/></svg>
+            </div>
+            <h3>Historial de servicios</h3>
+            <p>Cada reparación queda registrada con servicios, repuestos y total.</p>
+        </div>
+    </div>
+</section>
 {% endblock %}
