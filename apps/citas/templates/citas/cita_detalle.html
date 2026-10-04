@@ -33,7 +33,12 @@
 
 {% if detalle_economico %}
 <section class="mb-4" aria-labelledby="titulo-detalle-economico">
-    <h3 id="titulo-detalle-economico" class="h5">Detalle y total del servicio</h3>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h3 id="titulo-detalle-economico" class="h5 mb-0">Detalle y total del servicio</h3>
+        <a href="{% url 'citas:descargar_ticket' cita.id %}" class="btn btn-sm btn-outline-dark">
+            Descargar ticket (PDF)
+        </a>
+    </div>
     <div class="table-responsive">
         <table class="table table-sm">
             <caption class="caption-top">Servicios solicitados</caption>
