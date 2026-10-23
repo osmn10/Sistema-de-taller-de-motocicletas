@@ -4,7 +4,8 @@ from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import Avg, Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -18,7 +19,7 @@ from apps.servicios.models import Servicio
 from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
-from .models import Cita, CambioEstadoCita, EstadoCita, RepuestoUsado, ServicioCita
+from .models import CalificacionCita, Cita, CambioEstadoCita, EstadoCita, RepuestoUsado, ServicioCita
 from .totales import calcular_detalle_cita, precio_valido
 from .reporte_excel import generar_reporte_excel
 from .reporte_pdf import generar_reporte_pdf
@@ -277,14 +278,63 @@ def cita_detalle(request, cita_id):
         messages.error(request, 'Solo los clientes pueden ver el detalle de sus citas.')
         return redirect('core:home')
     cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
-    servicios = cita.serviciocita_set.select_related('servicio').all()
-    return render(request, 'citas/cita_detalle.html', {
+    return render(request, 'citas/cita_detalle.html', _contexto_cita_detalle(cita))
+
+
+def _contexto_cita_detalle(cita, errores=None, datos_calificacion=None):
+    """Contexto del detalle de cita; ``calificar_cita`` lo reutiliza para mostrar errores (V2SCRUM-42)."""
+    return {
         'cita': cita,
-        'servicios': servicios,
+        'servicios': cita.serviciocita_set.select_related('servicio').all(),
         'detalle_economico': (
             calcular_detalle_cita(cita) if cita.estado.tipo == EstadoCita.TIPO_COMPLETADO else None
         ),
-    })
+        'calificacion': getattr(cita, 'calificacion', None),
+        'puede_calificar': cita.puede_calificarse(),
+        'estrellas': CalificacionCita.PUNTUACIONES,
+        'comentario_max': CalificacionCita.COMENTARIO_MAX,
+        'errores': errores or {},
+        'datos_calificacion': datos_calificacion or {},
+    }
+
+
+@login_required(login_url='usuarios:login')
+def calificar_cita(request, cita_id):
+    """V2SCRUM-42. El cliente califica (1 a 5 y comentario opcional) una cita completada, una sola vez."""
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden calificar sus citas.')
+        return redirect('core:home')
+    cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
+    if request.method != 'POST':
+        return redirect('citas:cita_detalle', cita_id=cita.id)
+
+    if not cita.puede_calificarse():
+        messages.error(request, 'Esta cita no se puede calificar: debe estar completada y sin calificación previa.')
+        return redirect('citas:cita_detalle', cita_id=cita.id)
+
+    datos = {
+        'puntuacion': request.POST.get('puntuacion', '').strip(),
+        'comentario': request.POST.get('comentario', '').strip(),
+    }
+    errores = {}
+    puntuacion = int(datos['puntuacion']) if datos['puntuacion'].isdigit() else None
+    if puntuacion not in CalificacionCita.PUNTUACIONES:
+        errores['puntuacion'] = 'Elegí una puntuación de 1 a 5 estrellas.'
+    if len(datos['comentario']) > CalificacionCita.COMENTARIO_MAX:
+        errores['comentario'] = f'El comentario no puede pasar de {CalificacionCita.COMENTARIO_MAX} caracteres.'
+
+    if errores:
+        return render(request, 'citas/cita_detalle.html', _contexto_cita_detalle(cita, errores, datos))
+
+    try:
+        with transaction.atomic():
+            CalificacionCita.objects.create(cita=cita, puntuacion=puntuacion, comentario=datos['comentario'])
+    except IntegrityError:  # doble envío: la cita ya quedó calificada
+        messages.error(request, 'Esta cita ya fue calificada.')
+        return redirect('citas:cita_detalle', cita_id=cita.id)
+
+    messages.success(request, '¡Gracias! Tu calificación quedó registrada.')
+    return redirect('citas:cita_detalle', cita_id=cita.id)
 
 
 @login_required(login_url='usuarios:login')
@@ -1009,4 +1059,42 @@ def reporte_servicios(request):
         'servicios': Servicio.objects.filter(activo=True).order_by('nombre'),
         'mecanicos': Mecanico.objects.order_by('apellido', 'nombre'),
         **datos,
+    })
+
+
+@login_required(login_url='usuarios:login')
+def calificaciones(request):
+    """V2SCRUM-42. El administrador consulta las calificaciones, con filtros por mecánico y puntuación."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    mecanico_dui = request.GET.get('mecanico') or None
+    puntuacion = request.GET.get('puntuacion', '')
+    puntuacion = int(puntuacion) if puntuacion.isdigit() and int(puntuacion) in CalificacionCita.PUNTUACIONES else None
+
+    calificaciones_qs = CalificacionCita.objects.select_related('cita__cliente', 'cita__mecanico')
+    if mecanico_dui:
+        calificaciones_qs = calificaciones_qs.filter(cita__mecanico__dui=mecanico_dui)
+    if puntuacion:
+        calificaciones_qs = calificaciones_qs.filter(puntuacion=puntuacion)
+
+    resumen = calificaciones_qs.aggregate(promedio=Avg('puntuacion'), total=Count('id'))
+    total = resumen['total']
+    # Cantidad por puntuación en una sola consulta: {5: 3, 4: 1, ...}
+    conteo = dict(calificaciones_qs.values_list('puntuacion').annotate(Count('id')).order_by())
+    distribucion = [
+        {'estrellas': n, 'cantidad': conteo.get(n, 0), 'porcentaje': round(conteo.get(n, 0) * 100 / total) if total else 0}
+        for n in CalificacionCita.PUNTUACIONES
+    ]
+
+    return render(request, 'citas/calificaciones.html', {
+        'calificaciones': calificaciones_qs,
+        'promedio': resumen['promedio'],
+        'total': total,
+        'distribucion': distribucion,
+        'mecanicos': Mecanico.objects.order_by('apellido', 'nombre'),
+        'mecanico_dui': mecanico_dui,
+        'puntuacion': puntuacion,
+        'puntuaciones': CalificacionCita.PUNTUACIONES,
     })

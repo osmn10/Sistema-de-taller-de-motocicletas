@@ -12,6 +12,7 @@ urlpatterns = [
     path('mis-citas/<int:cita_id>/ticket/', views.descargar_ticket, name='descargar_ticket'),
     path('mis-citas/<int:cita_id>/cancelar/', views.cancelar_cita, name='cancelar_cita'),
     path('mis-citas/<int:cita_id>/reagendar/', views.reagendar_cita, name='reagendar_cita'),
+    path('mis-citas/<int:cita_id>/calificar/', views.calificar_cita, name='calificar_cita'),
     path('disponibilidad/', views.disponibilidad, name='disponibilidad'),
     path('agendar/', views.agendar_cita, name='agendar_cita'),
     path('calendario/', views.calendario, name='calendario'),
@@ -19,4 +20,5 @@ urlpatterns = [
     path('mis-citas-mecanico/', views.mis_citas_mecanico, name='mis_citas_mecanico'),
     path('estados/', views.estados_cita, name='estados_cita'),
     path('reporte/', views.reporte_servicios, name='reporte_servicios'),
+    path('calificaciones/', views.calificaciones, name='calificaciones'),
 ]

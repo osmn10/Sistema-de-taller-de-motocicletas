@@ -113,6 +113,13 @@
         <p class="mb-4">{{ cita.observaciones_cierre }}</p>
         {% endif %}
 
+        {% if cita.calificacion %}
+        <!-- V2SCRUM-42: calificación que dejó el cliente -->
+        <p class="eyebrow mb-1">CALIFICACIÓN DEL CLIENTE</p>
+        <p class="mb-1 fs-5"><span class="text-warning" aria-label="{{ cita.calificacion.puntuacion }} de 5 estrellas">{{ cita.calificacion.estrellas }}</span></p>
+        <p class="mb-4">{{ cita.calificacion.comentario|default:'Sin comentario.' }}</p>
+        {% endif %}
+
         {% if puede_finalizar %}
         <hr class="my-4">
         <p class="eyebrow mb-3">FINALIZAR SERVICIO</p>
