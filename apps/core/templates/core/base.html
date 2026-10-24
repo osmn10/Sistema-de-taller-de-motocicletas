@@ -60,6 +60,7 @@
                 <a class="side-link {% if ns == 'productos' and un != 'proveedores' %}active{% endif %}" href="{% url 'productos:inventario' %}">{% include 'core/_icon.html' with name='productos' %}<span>Productos</span></a>
                 <a class="side-link {% if un == 'proveedores' %}active{% endif %}" href="{% url 'productos:proveedores' %}">{% include 'core/_icon.html' with name='proveedores' %}<span>Proveedores</span></a>
                 <a class="side-link {% if un == 'usuarios_lista' or un == 'usuario_crear' or un == 'usuario_editar' %}active{% endif %}" href="{% url 'usuarios:usuarios_lista' %}">{% include 'core/_icon.html' with name='usuarios' %}<span>Usuarios</span></a>
+                <a class="side-link {% if un == 'dashboard' %}active{% endif %}" href="{% url 'core:dashboard' %}">{% include 'core/_icon.html' with name='grafica' %}<span>Dashboard</span></a>
                 <a class="side-link {% if ns == 'configuracion' %}active{% endif %}" href="{% url 'configuracion:horario' %}">{% include 'core/_icon.html' with name='horario' %}<span>Horario</span></a>
             {% elif user.is_mecanico %}
                 <a class="side-link {% if un == 'panel_mecanico' %}active{% endif %}" href="{% url 'core:panel_mecanico' %}">{% include 'core/_icon.html' with name='inicio' %}<span>Inicio</span></a>
