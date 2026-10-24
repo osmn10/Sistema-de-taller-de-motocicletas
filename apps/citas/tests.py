@@ -16,7 +16,7 @@ from apps.servicios.models import Servicio
 from apps.usuarios.models import Mecanico, Usuario
 from apps.vehiculos.models import Motocicleta
 
-from .models import Cita, EstadoCita, RepuestoUsado, ServicioCita
+from .models import CalificacionCita, Cita, EstadoCita, RepuestoUsado, ServicioCita
 from .reportes import calcular_reporte_servicios
 from .services import (
     notificar_cita_agendada,
@@ -1113,3 +1113,281 @@ class ReporteServiciosTests(TestCase):
 
         libro = load_workbook(BytesIO(respuesta.content))
         self.assertEqual(libro['Resumen']['B4'].value, 1)
+
+
+class ReasignarMecanicoTests(TestCase):
+    """Reasignar el mecánico de una cita validando su disponibilidad."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = Usuario.objects.create_admin(
+            dui='88888888-8', password='admin123', nombre='Beto', apellido='Admin',
+            telefono='7000-8888', email='admin3@example.com',
+        )
+        cls.cliente = Usuario.objects.create_cliente(
+            dui='77777777-7', password='cliente123', nombre='Ana', apellido='López',
+            telefono='7000-7777', email='ana@example.com', direccion='San Salvador',
+        )
+        cls.mecanico_a, cls.mecanico_b = (
+            Usuario.objects.create_mecanico(
+                dui=f'{n}' * 8 + f'-{n}', password='mecanico123', nombre=nombre, apellido='Prueba',
+                telefono=f'7000-{n}{n}{n}{n}', email=f'{nombre.lower()}@example.com',
+                especialidad=Mecanico.ESPECIALIDAD_MECANICA_GENERAL,
+            )
+            for n, nombre in ((1, 'Andres'), (2, 'Bruno'))
+        )
+        cls.motocicleta = Motocicleta.objects.create(
+            placa='M-1234', cliente=cls.cliente, marca='Honda', modelo='CB 190', anio=2022, color='Rojo',
+        )
+        cls.servicio = Servicio.objects.create(nombre='Cambio de aceite', precio_base='15.00', duracion_estimada=60)
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def crear_cita(self, hora, mecanico, estado='confirmada'):
+        cita = Cita.objects.create(
+            cliente=self.cliente, motocicleta=self.motocicleta, mecanico=mecanico,
+            fecha=date.today() + timedelta(days=1), hora=hora, estado_id=estado,
+        )
+        ServicioCita.objects.create(cita=cita, servicio=self.servicio, precio_final=self.servicio.precio_base)
+        return cita
+
+    def reasignar(self, cita, mecanico):
+        respuesta = self.client.post(
+            reverse('citas:cita_admin_detalle', args=[cita.id]),
+            {'accion': 'asignar_mecanico', 'mecanico_dui': mecanico.dui},
+            follow=True,
+        )
+        cita.refresh_from_db()
+        return respuesta
+
+    def test_lista_solo_mecanicos_disponibles(self):
+        self.crear_cita(time(9, 0), self.mecanico_b)
+        cita = self.crear_cita(time(9, 30), self.mecanico_a)
+
+        respuesta = self.client.get(reverse('citas:cita_admin_detalle', args=[cita.id]))
+
+        self.assertEqual(list(respuesta.context['mecanicos']), [self.mecanico_a])
+
+    def test_reasigna_a_mecanico_disponible(self):
+        self.crear_cita(time(8, 0), self.mecanico_b)  # termina 9:00, no se cruza
+        cita = self.crear_cita(time(9, 0), self.mecanico_a)
+
+        respuesta = self.reasignar(cita, self.mecanico_b)
+
+        self.assertEqual(cita.mecanico, self.mecanico_b)
+        self.assertContains(respuesta, 'Cita reasignada')
+
+    def test_rechaza_si_el_mecanico_tiene_cita_que_se_cruza(self):
+        for hora_ocupada in (time(9, 0), time(9, 30)):  # misma hora y traslape
+            with self.subTest(hora_ocupada=hora_ocupada):
+                otra = self.crear_cita(hora_ocupada, self.mecanico_b)
+                cita = self.crear_cita(time(9, 0), self.mecanico_a)
+
+                respuesta = self.reasignar(cita, self.mecanico_b)
+
+                self.assertEqual(cita.mecanico, self.mecanico_a)
+                self.assertContains(respuesta, 'no está disponible')
+                otra.delete()
+                cita.delete()
+
+    def test_cita_cancelada_no_ocupa_al_mecanico(self):
+        self.crear_cita(time(9, 0), self.mecanico_b, estado='cancelada')
+        cita = self.crear_cita(time(9, 0), self.mecanico_a)
+
+        self.reasignar(cita, self.mecanico_b)
+
+        self.assertEqual(cita.mecanico, self.mecanico_b)
+
+
+class CalificacionCitaTests(TestCase):
+    """V2SCRUM-42: el cliente califica el servicio y el admin consulta las calificaciones."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = Usuario.objects.create_admin(
+            dui='30000000-1', password='admin123', nombre='Ana', apellido='Admin',
+            telefono='7100-0001', email='ana-calif@example.com',
+        )
+        cls.cliente = Usuario.objects.create_cliente(
+            dui='30000000-2', password='cliente123', nombre='Pedro', apellido='Cliente',
+            telefono='7100-0002', email='pedro-calif@example.com', direccion='San Miguel',
+        )
+        cls.otro_cliente = Usuario.objects.create_cliente(
+            dui='30000000-3', password='cliente123', nombre='Lucía', apellido='Otra',
+            telefono='7100-0003', email='lucia-calif@example.com', direccion='Santa Ana',
+        )
+        cls.mecanico1 = Usuario.objects.create_mecanico(
+            dui='30000000-4', password='mecanico123', nombre='Beto', apellido='Alfa',
+            telefono='7100-0004', email='beto-calif@example.com',
+            especialidad=Mecanico.ESPECIALIDAD_MECANICA_GENERAL,
+        )
+        cls.mecanico2 = Usuario.objects.create_mecanico(
+            dui='30000000-5', password='mecanico123', nombre='Carla', apellido='Beta',
+            telefono='7100-0005', email='carla-calif@example.com',
+            especialidad=Mecanico.ESPECIALIDAD_MOTOR,
+        )
+        cls.moto = Motocicleta.objects.create(
+            placa='M-9100', cliente=cls.cliente, marca='Honda', modelo='CG 150',
+            anio=2023, color='Negro',
+        )
+        cls.moto_otro = Motocicleta.objects.create(
+            placa='M-9101', cliente=cls.otro_cliente, marca='Yamaha', modelo='FZ',
+            anio=2022, color='Azul',
+        )
+        cls.est_inicio = EstadoCita.objects.get(tipo=EstadoCita.TIPO_INICIO)
+        cls.est_completado = EstadoCita.objects.get(tipo=EstadoCita.TIPO_COMPLETADO)
+
+    def crear_cita(self, estado=None, cliente=None, moto=None, mecanico=None):
+        return Cita.objects.create(
+            cliente=cliente or self.cliente, motocicleta=moto or self.moto,
+            mecanico=mecanico or self.mecanico1, fecha=date.today(), hora=time(9, 0),
+            estado=estado or self.est_completado,
+        )
+
+    def calificar(self, cita, puntuacion='5', comentario=''):
+        return self.client.post(
+            reverse('citas:calificar_cita', args=[cita.id]),
+            {'puntuacion': puntuacion, 'comentario': comentario},
+        )
+
+    # --- cliente califica (criterios 1 y 2) ---
+
+    def test_cliente_califica_cita_completada_con_comentario(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.cliente)
+
+        respuesta = self.calificar(cita, '4', 'Buena atención y rápido.')
+
+        self.assertRedirects(respuesta, reverse('citas:cita_detalle', args=[cita.id]))
+        calificacion = CalificacionCita.objects.get(cita=cita)
+        self.assertEqual(calificacion.puntuacion, 4)
+        self.assertEqual(calificacion.comentario, 'Buena atención y rápido.')
+
+    def test_comentario_es_opcional(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.cliente)
+
+        self.calificar(cita, '5')
+
+        self.assertEqual(CalificacionCita.objects.get(cita=cita).comentario, '')
+
+    def test_no_se_califica_cita_no_completada(self):
+        cita = self.crear_cita(estado=self.est_inicio)
+        self.client.force_login(self.cliente)
+
+        self.calificar(cita)
+
+        self.assertFalse(CalificacionCita.objects.exists())
+
+    def test_no_se_califica_dos_veces(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.cliente)
+
+        self.calificar(cita, '5')
+        self.calificar(cita, '1', 'Intento de cambiarla')
+
+        self.assertEqual(CalificacionCita.objects.filter(cita=cita).count(), 1)
+        self.assertEqual(CalificacionCita.objects.get(cita=cita).puntuacion, 5)
+
+    def test_puntuacion_fuera_de_rango_o_invalida(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.cliente)
+
+        for valor in ['0', '6', 'abc', '']:
+            with self.subTest(valor=valor):
+                respuesta = self.calificar(cita, valor)
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertContains(respuesta, 'Elegí una puntuación de 1 a 5 estrellas.')
+        self.assertFalse(CalificacionCita.objects.exists())
+
+    def test_comentario_demasiado_largo(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.cliente)
+
+        respuesta = self.calificar(cita, '5', 'x' * (CalificacionCita.COMENTARIO_MAX + 1))
+
+        self.assertContains(respuesta, 'El comentario no puede pasar de')
+        self.assertFalse(CalificacionCita.objects.exists())
+
+    def test_no_se_califica_cita_ajena(self):
+        cita_ajena = self.crear_cita(cliente=self.otro_cliente, moto=self.moto_otro)
+        self.client.force_login(self.cliente)
+
+        respuesta = self.calificar(cita_ajena)
+
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertFalse(CalificacionCita.objects.exists())
+
+    def test_solo_clientes_califican(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.admin)
+
+        self.calificar(cita)
+
+        self.assertFalse(CalificacionCita.objects.exists())
+
+    def test_detalle_muestra_formulario_solo_si_puede_calificar(self):
+        completada = self.crear_cita()
+        pendiente = self.crear_cita(estado=self.est_inicio)
+        self.client.force_login(self.cliente)
+
+        self.assertContains(
+            self.client.get(reverse('citas:cita_detalle', args=[completada.id])),
+            'Enviar calificación',
+        )
+        self.assertNotContains(
+            self.client.get(reverse('citas:cita_detalle', args=[pendiente.id])),
+            'Enviar calificación',
+        )
+
+        self.calificar(completada, '3', 'Regular')
+        respuesta = self.client.get(reverse('citas:cita_detalle', args=[completada.id]))
+        self.assertNotContains(respuesta, 'Enviar calificación')
+        self.assertContains(respuesta, 'Tu calificación')
+        self.assertContains(respuesta, 'Regular')
+
+    # --- admin consulta (criterio 3) ---
+
+    def test_lista_requiere_admin(self):
+        self.client.force_login(self.cliente)
+
+        respuesta = self.client.get(reverse('citas:calificaciones'))
+
+        self.assertRedirects(respuesta, reverse('core:home'), fetch_redirect_response=False)
+
+    def test_admin_ve_calificaciones_y_promedio(self):
+        CalificacionCita.objects.create(cita=self.crear_cita(), puntuacion=5, comentario='Excelente servicio')
+        CalificacionCita.objects.create(cita=self.crear_cita(), puntuacion=4)
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.get(reverse('citas:calificaciones'))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.context['total'], 2)
+        self.assertEqual(respuesta.context['promedio'], 4.5)
+        self.assertContains(respuesta, 'Excelente servicio')
+
+    def test_filtros_por_mecanico_y_puntuacion(self):
+        CalificacionCita.objects.create(cita=self.crear_cita(mecanico=self.mecanico1), puntuacion=5)
+        CalificacionCita.objects.create(cita=self.crear_cita(mecanico=self.mecanico2), puntuacion=2)
+        CalificacionCita.objects.create(cita=self.crear_cita(mecanico=self.mecanico2), puntuacion=5)
+        self.client.force_login(self.admin)
+        url = reverse('citas:calificaciones')
+
+        por_mecanico = self.client.get(url, {'mecanico': self.mecanico2.dui})
+        self.assertEqual(por_mecanico.context['total'], 2)
+
+        por_puntuacion = self.client.get(url, {'puntuacion': '5'})
+        self.assertEqual(por_puntuacion.context['total'], 2)
+
+        combinados = self.client.get(url, {'mecanico': self.mecanico2.dui, 'puntuacion': '5'})
+        self.assertEqual(combinados.context['total'], 1)
+
+    def test_puntuacion_invalida_en_filtro_se_ignora(self):
+        CalificacionCita.objects.create(cita=self.crear_cita(), puntuacion=3)
+        self.client.force_login(self.admin)
+
+        respuesta = self.client.get(reverse('citas:calificaciones'), {'puntuacion': '9'})
+
+        self.assertEqual(respuesta.context['total'], 1)

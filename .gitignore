@@ -20,5 +20,5 @@ staticfiles/
 # Editores / IDEs
 .vscode/
 
-# Estado local de oh-my-claudecode (no se sube)
+# Estado local de OMC, herramienta de orquestacion (no se sube)
 .omc/
