@@ -18,6 +18,8 @@ urlpatterns = [
 
     path('mi-perfil/', views.mi_perfil, name='mi_perfil'),
     path('clientes/', views.clientes_lista, name='clientes_lista'),
+    # V2SCRUM-41: debe ir antes de clientes/<str:dui>/ para que "exportar" no se tome como DUI
+    path('clientes/exportar/', views.clientes_exportar, name='clientes_exportar'),
     path('clientes/<str:dui>/', views.cliente_detalle, name='cliente_detalle'),
     path('clientes/<str:dui>/editar/', views.cliente_editar, name='cliente_editar'),
     path('clientes/<str:dui>/toggle/', views.cliente_toggle, name='cliente_toggle'),
