@@ -1,18 +1,58 @@
 """Lógica de negocio (services) para la gestión de citas."""
 
 import logging
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
 from django.conf import settings
 
 from apps.core.emails import enviar_correo_html
+from apps.usuarios.models import Mecanico
 
-from .models import Cita
+from .models import Cita, EstadoCita
 from .totales import calcular_detalle_cita
 from .ticket_pdf import generar_ticket_pdf
 
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Disponibilidad de mecánicos (reasignación de citas)
+# ---------------------------------------------------------------------------
+# Tipos de estado en los que una cita ocupa el tiempo del mecánico.
+TIPOS_ACTIVOS = (EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO)
+
+
+def _rango(cita: Cita) -> tuple[datetime, datetime]:
+    """Inicio y fin de la cita según la duración de sus servicios."""
+    inicio = datetime.combine(cita.fecha, cita.hora)
+    minutos = sum(sc.servicio.duracion_estimada for sc in cita.serviciocita_set.all())
+    return inicio, inicio + timedelta(minutes=minutos)
+
+
+def _citas_que_se_cruzan(cita: Cita, **filtros):
+    """Citas activas con mecánico que se cruzan con el horario de ``cita``."""
+    inicio, fin = _rango(cita)
+    otras = (
+        Cita.objects.filter(fecha=cita.fecha, estado__tipo__in=TIPOS_ACTIVOS, mecanico__isnull=False, **filtros)
+        .exclude(id=cita.id)
+        .prefetch_related('serviciocita_set__servicio')
+    )
+    for otra in otras:
+        otra_inicio, otra_fin = _rango(otra)
+        if otra_inicio == inicio or (inicio < otra_fin and otra_inicio < fin):
+            yield otra
+
+
+def cita_en_conflicto(mecanico: Mecanico, cita: Cita) -> Cita | None:
+    """Primera cita del mecánico que choca con ``cita``, o None si está libre."""
+    return next(_citas_que_se_cruzan(cita, mecanico=mecanico), None)
+
+
+def mecanicos_disponibles(cita: Cita):
+    """Mecánicos activos libres en el horario de ``cita``."""
+    ocupados = {otra.mecanico_id for otra in _citas_que_se_cruzan(cita)}
+    return Mecanico.objects.filter(activo=True).exclude(pk__in=ocupados).order_by('apellido', 'nombre')
 
 
 def _cita_con_detalles(cita_id: int) -> tuple[Cita, list]:

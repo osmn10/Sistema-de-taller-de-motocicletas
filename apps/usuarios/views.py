@@ -1,6 +1,7 @@
 """Vistas de la app usuarios."""
 
 import re
+from datetime import date
 
 from django.conf import settings
 from django.contrib import messages
@@ -9,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.tokens import default_token_generator
 from django.db import connection, transaction
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.encoding import force_bytes
@@ -17,6 +19,7 @@ from django.views import View
 
 from apps.core.emails import enviar_correo_html
 
+from .exportacion import generar_excel_clientes_vehiculos
 from .models import Cliente, Mecanico, Usuario, dui_validator, telefono_validator
 from .validators import validar_password_segura
 
@@ -56,9 +59,9 @@ def registro_cliente(request):
             errores['contrasena'] = ' '.join(errores_password)
         elif contrasena != confirmar:
             errores['confirmar'] = 'Las contraseñas no coinciden.'
-        if Cliente.objects.filter(dui=datos['dui']).exists():
+        if Usuario.objects.filter(dui=datos['dui']).exists():
             errores['dui'] = 'Ya existe una cuenta con ese DUI.'
-        if Cliente.objects.filter(email=datos['email']).exists():
+        if Usuario.objects.filter(email=datos['email']).exists():
             errores['email'] = 'Ya existe una cuenta con ese correo.'
         if errores:
             return render(request, 'usuarios/registro_cliente.html', {
@@ -678,6 +681,24 @@ def clientes_lista(request):
         'q': q,
         'total': clientes.count(),
     })
+
+
+@login_required(login_url='usuarios:login')
+def clientes_exportar(request):
+    """V2SCRUM-41. Descarga un Excel con el listado completo de clientes y sus
+    vehículos (datos de contacto y datos básicos de cada moto). Solo admin."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    xlsx_bytes = generar_excel_clientes_vehiculos()
+    respuesta = HttpResponse(
+        xlsx_bytes,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    nombre = f'clientes_vehiculos_{date.today().isoformat()}.xlsx'
+    respuesta['Content-Disposition'] = f'attachment; filename="{nombre}"'
+    return respuesta
 
 
 @login_required(login_url='usuarios:login')

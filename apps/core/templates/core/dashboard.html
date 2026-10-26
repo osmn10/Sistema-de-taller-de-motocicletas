@@ -1,0 +1,102 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dashboard · Taller{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end mb-3 gap-2">
+    <h1 class="h3 mb-0">Dashboard</h1>
+
+    <form method="get" class="d-flex align-items-end gap-2">
+        <div>
+            <label for="desde" class="form-label text-muted small mb-1">Desde</label>
+            <input type="date" id="desde" name="desde" value="{{ desde|date:'Y-m-d' }}"
+                   class="form-control form-control-sm">
+        </div>
+        <div>
+            <label for="hasta" class="form-label text-muted small mb-1">Hasta</label>
+            <input type="date" id="hasta" name="hasta" value="{{ hasta|date:'Y-m-d' }}"
+                   class="form-control form-control-sm">
+        </div>
+        <button type="submit" class="btn btn-dark btn-sm">Aplicar</button>
+    </form>
+</div>
+
+<p class="text-muted small mb-4">Período: {{ desde|date:'d/m/Y' }} — {{ hasta|date:'d/m/Y' }}</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Citas del período</p>
+            <p class="h2 mb-0">{{ total_citas }}</p>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Servicios completados</p>
+            <p class="h2 mb-0">{{ servicios_completados }}</p>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Ingresos del período</p>
+            <p class="h2 mb-0">$&nbsp;{{ ingresos_periodo|floatformat:2 }}</p>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Inventario en nivel</p>
+            <p class="h2 mb-0">{{ avance_inventario }}%</p>
+            <p class="card-text text-muted small mb-0">{{ productos_en_nivel }} / {{ total_productos }} productos activos</p>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card h-100"><div class="card-body">
+            <h5 class="card-title">Citas por estado</h5>
+            <table class="table table-sm mb-0">
+                <tbody>
+                {% for fila in por_estado %}
+                    <tr>
+                        <td>{{ fila.etiqueta }}</td>
+                        <td class="text-end">{{ fila.valor }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div></div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card h-100"><div class="card-body">
+            <h5 class="card-title">Alerta de stock bajo</h5>
+            {% if productos_bajos %}
+                <div class="alert alert-warning py-2 small mb-3">
+                    {{ productos_bajos|length }} repuesto(s) por debajo del stock mínimo.
+                </div>
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th class="text-end">Stock actual</th>
+                            <th class="text-end">Stock mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for p in productos_bajos %}
+                        <tr>
+                            <td>{{ p.nombre }}</td>
+                            <td class="text-end text-danger fw-bold">{{ p.stock_actual }}</td>
+                            <td class="text-end text-muted">{{ p.stock_minimo }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted mb-0">Todos los repuestos activos están por encima del stock mínimo.</p>
+            {% endif %}
+        </div></div>
+    </div>
+</div>
+{% endblock %}
