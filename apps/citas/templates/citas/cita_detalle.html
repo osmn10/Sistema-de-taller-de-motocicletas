@@ -11,9 +11,15 @@
 <a href="{% url 'citas:mis_citas' %}" class="text-decoration-none text-muted small">‹ Volver a mis citas</a>
 
 <!-- Encabezado: número de cita + badge con el estado actual -->
-<div class="mt-3 mb-4 d-flex align-items-center gap-3">
+<div class="mt-3 mb-4 d-flex align-items-center gap-3 flex-wrap">
     <h2 class="mb-0">Cita #{{ cita.id }}</h2>
     <span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span>
+    <!-- V2SCRUM-36: comprobante de la reserva, disponible mientras la cita no esté cancelada -->
+    {% if cita.estado.tipo != 'cancelado' %}
+    <a href="{% url 'citas:descargar_comprobante' cita.id %}" class="btn btn-sm btn-outline-dark ms-auto">
+        Descargar comprobante (PDF)
+    </a>
+    {% endif %}
 </div>
 
 <!-- Sección: Fecha y hora de la cita -->
