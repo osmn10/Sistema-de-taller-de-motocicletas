@@ -19,6 +19,7 @@ from apps.servicios.models import Servicio
 from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
+from .comprobante_pdf import generar_comprobante_pdf, numero_comprobante
 from .models import CalificacionCita, Cita, CambioEstadoCita, EstadoCita, RepuestoUsado, ServicioCita
 from .totales import calcular_detalle_cita, precio_valido
 from .reporte_excel import generar_reporte_excel
@@ -257,7 +258,11 @@ def agendar_cita(request):
                 lambda cita_id=cita.id: notificar_cita_agendada(cita_id)
             )
 
-        messages.success(request, f'Cita #{cita.id} agendada para el {fecha} a las {hora.strftime("%H:%M")}.')
+        messages.success(
+            request,
+            f'Cita #{cita.id} agendada para el {fecha.strftime("%d/%m/%Y")} a las {hora.strftime("%H:%M")}. '
+            'Ya podés descargar tu comprobante.',
+        )
         return redirect('citas:cita_detalle', cita_id=cita.id)
 
     return render(request, 'citas/agendar_cita.html', {
@@ -361,6 +366,27 @@ def descargar_ticket(request, cita_id):
     pdf_bytes = generar_ticket_pdf(cita, detalle)
     respuesta = HttpResponse(pdf_bytes, content_type='application/pdf')
     respuesta['Content-Disposition'] = f'attachment; filename="ticket_cita_{cita.id}.pdf"'
+    return respuesta
+
+
+@login_required(login_url='usuarios:login')
+def descargar_comprobante(request, cita_id):
+    """V2SCRUM-36. Descarga del comprobante PDF de una cita agendada.
+
+    Disponible desde que la cita se agenda y en cualquier momento posterior,
+    salvo que la cita esté cancelada (ya no hay reserva que comprobar).
+    """
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden descargar el comprobante de sus citas.')
+        return redirect('core:home')
+
+    cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
+    if cita.estado.tipo == EstadoCita.TIPO_CANCELADO:
+        messages.error(request, 'La cita está cancelada: ya no tiene comprobante de reserva.')
+        return redirect('citas:cita_detalle', cita_id=cita.id)
+
+    respuesta = HttpResponse(generar_comprobante_pdf(cita), content_type='application/pdf')
+    respuesta['Content-Disposition'] = f'attachment; filename="comprobante_{numero_comprobante(cita)}.pdf"'
     return respuesta
 
 
