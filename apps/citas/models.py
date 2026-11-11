@@ -1,5 +1,6 @@
 """Modelos de la app citas."""
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Case, IntegerField, When
 
@@ -140,6 +141,10 @@ class Cita(models.Model):
         """Mismas condiciones que cancelar."""
         return self.estado.permite_cancelar
 
+    def puede_calificarse(self):
+        """V2SCRUM-42: solo citas completadas y sin calificación previa."""
+        return self.estado.tipo == EstadoCita.TIPO_COMPLETADO and not hasattr(self, 'calificacion')
+
 
 class ServicioCita(models.Model):
     """Association class entre Cita y Servicio."""
@@ -197,3 +202,33 @@ class RepuestoUsado(models.Model):
 
     def __str__(self):
         return f'{self.cantidad} x {self.producto.nombre} — Cita #{self.cita.id}'
+
+
+class CalificacionCita(models.Model):
+    """V2SCRUM-42: calificación (1 a 5) del cliente a una cita completada; una por cita, no editable."""
+
+    PUNTUACION_MIN = 1
+    PUNTUACION_MAX = 5
+    PUNTUACIONES = range(PUNTUACION_MAX, PUNTUACION_MIN - 1, -1)  # 5..1, para formularios y filtros
+    COMENTARIO_MAX = 500
+
+    cita = models.OneToOneField(Cita, on_delete=models.CASCADE, related_name='calificacion')
+    puntuacion = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(PUNTUACION_MIN), MaxValueValidator(PUNTUACION_MAX)],
+        help_text='De 1 a 5 estrellas.',
+    )
+    comentario = models.TextField(blank=True, max_length=COMENTARIO_MAX)
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_registro']
+        verbose_name = 'Calificación de cita'
+        verbose_name_plural = 'Calificaciones de citas'
+
+    def __str__(self):
+        return f'{self.puntuacion}/5 — Cita #{self.cita.id}'
+
+    @property
+    def estrellas(self):
+        """Puntuación en estrellas para mostrar, p. ej. ★★★☆☆."""
+        return '★' * self.puntuacion + '☆' * (self.PUNTUACION_MAX - self.puntuacion)

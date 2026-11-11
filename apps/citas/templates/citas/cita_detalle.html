@@ -11,9 +11,15 @@
 <a href="{% url 'citas:mis_citas' %}" class="text-decoration-none text-muted small">‹ Volver a mis citas</a>
 
 <!-- Encabezado: número de cita + badge con el estado actual -->
-<div class="mt-3 mb-4 d-flex align-items-center gap-3">
+<div class="mt-3 mb-4 d-flex align-items-center gap-3 flex-wrap">
     <h2 class="mb-0">Cita #{{ cita.id }}</h2>
     <span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span>
+    <!-- V2SCRUM-36: comprobante de la reserva, disponible mientras la cita no esté cancelada -->
+    {% if cita.estado.tipo != 'cancelado' %}
+    <a href="{% url 'citas:descargar_comprobante' cita.id %}" class="btn btn-sm btn-outline-dark ms-auto">
+        Descargar comprobante (PDF)
+    </a>
+    {% endif %}
 </div>
 
 <!-- Sección: Fecha y hora de la cita -->
@@ -95,6 +101,50 @@
     <!-- Se muestra si no hay servicios asociados a la cita -->
     <p class="text-muted">Sin servicios.</p>
 {% endfor %}
+{% endif %}
+
+<!-- Sección: Calificación del servicio (V2SCRUM-42), solo en citas completadas -->
+{% if calificacion %}
+<section class="mb-4" aria-labelledby="titulo-calificacion">
+    <h3 id="titulo-calificacion" class="h5 mb-2">Tu calificación</h3>
+    <p class="fs-4 mb-1"><span class="text-warning" aria-label="{{ calificacion.puntuacion }} de 5 estrellas">{{ calificacion.estrellas }}</span></p>
+    {% if calificacion.comentario %}<p class="mb-1">{{ calificacion.comentario }}</p>{% endif %}
+    <p class="small text-muted mb-0">Enviada el {{ calificacion.fecha_registro|date:'d/m/Y' }}. ¡Gracias por tu opinión!</p>
+</section>
+{% elif puede_calificar %}
+<section class="mb-4" aria-labelledby="titulo-calificar">
+    <h3 id="titulo-calificar" class="h5 mb-1">Calificá el servicio recibido</h3>
+    <p class="small text-muted mb-3">Tu opinión nos ayuda a mejorar. Solo se puede enviar una vez.</p>
+    <form method="post" action="{% url 'citas:calificar_cita' cita.id %}" novalidate>
+        {% csrf_token %}
+        <fieldset class="mb-3">
+            <legend class="form-label fs-6">Puntuación</legend>
+            <div class="d-flex flex-wrap gap-2">
+                {% for n in estrellas %}
+                <input type="radio" class="btn-check" name="puntuacion" id="puntuacion-{{ n }}" value="{{ n }}"
+                       {% if datos_calificacion.puntuacion == n|stringformat:'s' %}checked{% endif %} required>
+                <label class="btn btn-outline-dark" for="puntuacion-{{ n }}" aria-label="{{ n }} de 5 estrellas">
+                    {{ n }} ★
+                </label>
+                {% endfor %}
+            </div>
+            {% if errores.puntuacion %}
+                <div class="text-danger small mt-1">{{ errores.puntuacion }}</div>
+            {% endif %}
+        </fieldset>
+        <div class="mb-3">
+            <label for="comentario" class="form-label">Comentario <span class="text-muted">(opcional)</span></label>
+            <textarea id="comentario" name="comentario" rows="3" maxlength="{{ comentario_max }}"
+                      class="form-control {% if errores.comentario %}is-invalid{% endif %}"
+                      placeholder="Contanos cómo te atendieron">{{ datos_calificacion.comentario }}</textarea>
+            {% if errores.comentario %}
+                <div class="invalid-feedback">{{ errores.comentario }}</div>
+            {% endif %}
+            <div class="form-text">Máximo {{ comentario_max }} caracteres.</div>
+        </div>
+        <button type="submit" class="btn btn-dark">Enviar calificación</button>
+    </form>
+</section>
 {% endif %}
 
 <!-- Botones de acción: solo se muestran si la cita puede reagendarse o cancelarse -->

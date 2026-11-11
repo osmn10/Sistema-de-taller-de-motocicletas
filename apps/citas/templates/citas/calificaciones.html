@@ -1,0 +1,97 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Calificaciones · Taller{% endblock %}
+
+{% block content %}
+<!-- V2SCRUM-42: calificaciones que los clientes dejaron al servicio recibido -->
+<h1 class="h3 mb-4">Calificaciones de clientes</h1>
+
+<form method="get" class="row row-cols-auto g-2 align-items-end mb-4">
+    <div class="col">
+        <label for="mecanico" class="form-label text-muted small mb-1">Mecánico</label>
+        <select id="mecanico" name="mecanico" class="form-select form-select-sm">
+            <option value="">Todos</option>
+            {% for m in mecanicos %}
+                <option value="{{ m.dui }}" {% if mecanico_dui == m.dui %}selected{% endif %}>
+                    {{ m.nombre }} {{ m.apellido }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col">
+        <label for="puntuacion" class="form-label text-muted small mb-1">Puntuación</label>
+        <select id="puntuacion" name="puntuacion" class="form-select form-select-sm">
+            <option value="">Todas</option>
+            {% for p in puntuaciones %}
+                <option value="{{ p }}" {% if puntuacion == p %}selected{% endif %}>{{ p }} ★</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col">
+        <button type="submit" class="btn btn-dark btn-sm">Aplicar</button>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Promedio</p>
+            <p class="h2 mb-0">{% if promedio %}{{ promedio|floatformat:1 }} <span class="text-warning">★</span>{% else %}—{% endif %}</p>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-1">Calificaciones recibidas</p>
+            <p class="h2 mb-0">{{ total }}</p>
+        </div></div>
+    </div>
+    <div class="col-12 col-lg-4">
+        <div class="card h-100"><div class="card-body">
+            <p class="card-text text-muted small mb-2">Distribución</p>
+            {% for fila in distribucion %}
+            <div class="d-flex align-items-center gap-2 small mb-1">
+                <span style="width: 2.5rem;">{{ fila.estrellas }} ★</span>
+                <div class="progress flex-grow-1" role="progressbar" aria-label="{{ fila.estrellas }} estrellas"
+                     aria-valuenow="{{ fila.porcentaje }}" aria-valuemin="0" aria-valuemax="100" style="height: .5rem;">
+                    <div class="progress-bar bg-warning" style="width: {{ fila.porcentaje }}%"></div>
+                </div>
+                <span class="text-muted text-end" style="width: 2rem;">{{ fila.cantidad }}</span>
+            </div>
+            {% endfor %}
+        </div></div>
+    </div>
+</div>
+
+<div class="card"><div class="card-body">
+    {% if calificaciones %}
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Cita</th>
+                    <th>Mecánico</th>
+                    <th>Puntuación</th>
+                    <th>Comentario</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in calificaciones %}
+                <tr>
+                    <td class="text-nowrap">{{ c.fecha_registro|date:'d/m/Y' }}</td>
+                    <td>{{ c.cita.cliente.nombre }} {{ c.cita.cliente.apellido }}</td>
+                    <td><a href="{% url 'citas:cita_admin_detalle' c.cita.id %}">#{{ c.cita.id }}</a></td>
+                    <td>{% if c.cita.mecanico %}{{ c.cita.mecanico.nombre }} {{ c.cita.mecanico.apellido }}{% else %}<span class="text-muted">Sin asignar</span>{% endif %}</td>
+                    <td class="text-warning text-nowrap" aria-label="{{ c.puntuacion }} de 5 estrellas">{{ c.estrellas }}</td>
+                    <td>{{ c.comentario|default:'—' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">Todavía no hay calificaciones{% if mecanico_dui or puntuacion %} con estos filtros{% endif %}.</p>
+    {% endif %}
+</div></div>
+{% endblock %}
