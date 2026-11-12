@@ -15,6 +15,7 @@
         <tr>
             <th class="text-muted fw-normal small">ESTADO</th>
             <th class="text-muted fw-normal small">TIPO</th>
+            <th class="text-muted fw-normal small">PUEDE PASAR A</th>
             <th class="text-muted fw-normal small">ACTIVO</th>
             <th></th>
         </tr>
@@ -27,6 +28,13 @@
                       style="--sb: {{ estado.color }}; --sb-rgb: {{ estado.color_rgb }};">{{ estado.nombre }}</span>
             </td>
             <td class="align-middle small">{{ estado.get_tipo_display }}</td>
+            <td class="align-middle small">
+                {% if estado.es_final %}
+                    <span class="text-muted">Estado final</span>
+                {% else %}
+                    {% for destino in estado.transiciones.all %}{{ destino.nombre }}{% if not destino.activo %} <span class="text-muted">(inactivo)</span>{% endif %}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-muted">—</span>{% endfor %}
+                {% endif %}
+            </td>
             <td class="align-middle">
                 <span class="badge rounded-pill status-badge {% if estado.activo %}status-on{% else %}status-off{% endif %} px-3 py-2">
                     {% if estado.activo %}Activo{% else %}Inactivo{% endif %}
@@ -51,7 +59,7 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="4" class="text-center text-muted py-4">No hay estados registrados.</td>
+            <td colspan="5" class="text-center text-muted py-4">No hay estados registrados.</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -97,10 +105,37 @@
                     {% endfor %}
                 </select>
                 <div class="form-text">Los estados nuevos normalmente son de tipo Proceso (ej. En reparación, Preparando para entrega).</div>
+                {% if not estado_editar %}
+                <div class="form-text">Al crearlo queda con las transiciones habituales de un estado de Proceso y disponible desde los demás estados de Proceso. Después podés cambiarlas con Editar.</div>
+                {% endif %}
                 {% if errores.tipo %}<div class="invalid-feedback">{{ errores.tipo }}</div>{% endif %}
             {% endif %}
         </div>
     </div>
+
+    {% if estado_editar %}
+    <div class="row mb-3 align-items-start">
+        <label class="col-sm-2 col-form-label">Puede pasar a</label>
+        <div class="col-sm-10">
+            {% if estado_editar.es_final %}
+                <p class="form-text mt-2 mb-0">Este es un estado final: una cita que llega acá ya no cambia de estado.</p>
+            {% else %}
+                {% for candidato in candidatos %}
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="transiciones"
+                           id="transicion-{{ candidato.codigo }}" value="{{ candidato.codigo }}"
+                           {% if candidato.codigo in transiciones_marcadas %}checked{% endif %}>
+                    <label class="form-check-label" for="transicion-{{ candidato.codigo }}">
+                        {{ candidato.nombre }} · {{ candidato.get_tipo_display }}{% if not candidato.activo %} · inactivo{% endif %}
+                    </label>
+                </div>
+                {% endfor %}
+                <div class="form-text">Marcá los estados a los que puede pasar una cita desde este. Los que no marqués no se ofrecen al cambiar el estado de una cita.</div>
+                {% if errores.transiciones %}<div class="text-danger small mt-1">{{ errores.transiciones }}</div>{% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <div class="d-flex gap-2 mt-4">
         <a href="{% url 'citas:estados_cita' %}" class="btn btn-outline-dark">Cancelar</a>

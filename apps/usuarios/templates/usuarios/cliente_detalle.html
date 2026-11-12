@@ -68,7 +68,10 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <strong>Motocicletas del cliente</strong>
-        <span class="text-muted small">Total: {{ motos.count }}</span>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small">Total: {{ motos.count }}</span>
+            <a href="{% url 'vehiculos:moto_crear_admin' dui=cliente.dui %}" class="btn btn-sm btn-dark">+ Registrar moto</a>
+        </div>
     </div>
     <div class="card-body p-0">
         {% if motos %}

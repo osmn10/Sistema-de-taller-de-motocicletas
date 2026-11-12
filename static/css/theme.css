@@ -1049,3 +1049,20 @@ a.text-muted:hover { color: var(--neon) !important; }
     border: 1px solid var(--cyber-line);
     padding: .4rem .75rem;
 }
+
+/* HU008: paginación con los colores del tema */
+.pagination {
+    --bs-pagination-bg: var(--cyber-surface);
+    --bs-pagination-color: var(--neon);
+    --bs-pagination-border-color: var(--cyber-line);
+    --bs-pagination-hover-bg: var(--cyber-surface-2);
+    --bs-pagination-hover-color: var(--neon);
+    --bs-pagination-hover-border-color: var(--cyber-line);
+    --bs-pagination-active-bg: var(--neon);
+    --bs-pagination-active-color: var(--cyber-bg);
+    --bs-pagination-active-border-color: var(--neon);
+    --bs-pagination-disabled-bg: var(--cyber-surface);
+    --bs-pagination-disabled-color: var(--cyber-muted);
+    --bs-pagination-disabled-border-color: var(--cyber-line);
+    --bs-pagination-focus-box-shadow: var(--glow);
+}

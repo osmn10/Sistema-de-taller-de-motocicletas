@@ -5,6 +5,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
+from apps.citas.models import EstadoCita
+from apps.usuarios.models import Cliente
+
 from .models import Motocicleta, placa_validator
 
 
@@ -46,14 +49,18 @@ def moto_crear(request):
             'kilometraje': request.POST.get('kilometraje', '').strip(),
         }
 
-        # reusamos el validator del modelo en vez de redefinir la regex aquí
-        try:
-            placa_validator(datos['placa'])
-        except Exception:
-            errores['placa'] = 'Formato inválido. Debe ser una letra, guión y 4 dígitos (ej. M-1234).'
-        # placa es PK → no puede repetirse a nivel global del sistema
-        if datos['placa'] and Motocicleta.objects.filter(placa=datos['placa']).exists():
-            errores['placa'] = 'Ya existe una moto con esa placa.'
+        # HU015: primero que no esté vacía, después el formato
+        if not datos['placa']:
+            errores['placa'] = 'La placa es obligatoria.'
+        else:
+            # reusamos el validator del modelo en vez de redefinir la regex aquí
+            try:
+                placa_validator(datos['placa'])
+            except Exception:
+                errores['placa'] = 'Formato inválido. Debe ser una letra, guión y 4 dígitos (ej. M-1234).'
+            # placa es PK → no puede repetirse a nivel global del sistema
+            if Motocicleta.objects.filter(placa=datos['placa']).exists():
+                errores['placa'] = 'Ya existe una moto con esa placa.'
 
         if not datos['marca']:
             errores['marca'] = 'La marca es obligatoria.'
@@ -196,6 +203,20 @@ def moto_toggle(request, placa):
         return redirect('vehiculos:mis_motos')
 
     moto = get_object_or_404(Motocicleta, placa=placa, cliente=request.user.cliente)
+
+    # HU015: no se desactiva una moto con citas pendientes, confirmadas o en proceso
+    if moto.activo:
+        citas_activas = moto.citas.filter(
+            estado__tipo__in=[EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO],
+        ).count()
+        if citas_activas:
+            messages.error(
+                request,
+                f'No se puede desactivar: la moto {moto.placa} tiene citas activas (pendientes, '
+                f'confirmadas o en proceso). Cancelalas o esperá a que finalicen.',
+            )
+            return redirect('vehiculos:mis_motos')
+
     moto.activo = not moto.activo
     moto.save()
     estado = 'activada' if moto.activo else 'desactivada'
@@ -224,4 +245,111 @@ def historial_moto(request, placa):
     return render(request, 'vehiculos/historial_moto.html', {
         'moto': moto,
         'citas': citas,
+    })
+
+
+@login_required(login_url='usuarios:login')
+def motos_lista(request):
+    """HU015. El administrador ve las motos de todos los clientes y las busca por placa."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    q = request.GET.get('q', '').strip().upper()
+    motos = Motocicleta.objects.select_related('cliente').order_by('placa')
+    if q:
+        motos = motos.filter(placa__icontains=q)
+
+    return render(request, 'vehiculos/motos_lista.html', {
+        'motos': motos,
+        'q': q,
+        'total': motos.count(),
+    })
+
+
+@login_required(login_url='usuarios:login')
+def moto_crear_admin(request, dui):
+    """HU015. El administrador registra una moto a nombre de un cliente."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    cliente = get_object_or_404(Cliente, dui=dui)
+    anio_max = datetime.date.today().year + 1
+
+    if request.method == 'POST':
+        errores = {}
+        datos = {
+            'placa':       request.POST.get('placa', '').strip().upper(),
+            'marca':       request.POST.get('marca', '').strip(),
+            'modelo':      request.POST.get('modelo', '').strip(),
+            'anio':        request.POST.get('anio', '').strip(),
+            'color':       request.POST.get('color', '').strip(),
+            'kilometraje': request.POST.get('kilometraje', '').strip(),
+        }
+
+        if not datos['placa']:
+            errores['placa'] = 'La placa es obligatoria.'
+        else:
+            try:
+                placa_validator(datos['placa'])
+            except Exception:
+                errores['placa'] = 'Formato inválido. Debe ser una letra, guión y 4 dígitos (ej. M-1234).'
+            if Motocicleta.objects.filter(placa=datos['placa']).exists():
+                errores['placa'] = 'Ya existe una moto con esa placa.'
+
+        if not datos['marca']:
+            errores['marca'] = 'La marca es obligatoria.'
+        elif len(datos['marca']) > 50:
+            errores['marca'] = 'La marca no puede pasar de 50 caracteres.'
+        if not datos['modelo']:
+            errores['modelo'] = 'El modelo es obligatorio.'
+        elif len(datos['modelo']) > 50:
+            errores['modelo'] = 'El modelo no puede pasar de 50 caracteres.'
+        if not datos['color']:
+            errores['color'] = 'El color es obligatorio.'
+        elif len(datos['color']) > 30:
+            errores['color'] = 'El color no puede pasar de 30 caracteres.'
+
+        try:
+            anio_int = int(datos['anio'])
+            if anio_int < 1980 or anio_int > anio_max:
+                errores['anio'] = f'El año debe estar entre 1980 y {anio_max}.'
+        except ValueError:
+            anio_int = None
+            errores['anio'] = 'El año debe ser un número.'
+
+        try:
+            km_int = int(datos['kilometraje'])
+            if km_int < 0:
+                errores['kilometraje'] = 'El kilometraje no puede ser negativo.'
+        except ValueError:
+            km_int = None
+            errores['kilometraje'] = 'El kilometraje debe ser un número.'
+
+        if errores:
+            return render(request, 'vehiculos/moto_admin_form.html', {
+                'cliente': cliente,
+                'datos': datos,
+                'errores': errores,
+                'anio_max': anio_max,
+            })
+
+        Motocicleta.objects.create(
+            placa=datos['placa'],
+            cliente=cliente,
+            marca=datos['marca'],
+            modelo=datos['modelo'],
+            anio=anio_int,
+            color=datos['color'],
+            kilometraje=km_int,
+        )
+        messages.success(request, f'Moto {datos["placa"]} registrada correctamente.')
+        return redirect('usuarios:cliente_detalle', dui=cliente.dui)
+
+    return render(request, 'vehiculos/moto_admin_form.html', {
+        'cliente': cliente,
+        'datos': {},
+        'errores': {},
+        'anio_max': anio_max,
     })

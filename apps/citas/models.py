@@ -42,6 +42,11 @@ class EstadoCita(models.Model):
         default=False,
         help_text='El cliente puede cancelar o reagendar la cita mientras esté en este estado.',
     )
+    # HU037: estados a los que puede pasar una cita desde este; los configura el admin
+    transiciones = models.ManyToManyField(
+        'self', symmetrical=False, blank=True, related_name='origenes',
+        help_text='Estados a los que puede pasar una cita desde este.',
+    )
     activo = models.BooleanField(default=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
@@ -58,32 +63,12 @@ class EstadoCita(models.Model):
         return self.tipo in [self.TIPO_COMPLETADO, self.TIPO_CANCELADO]
 
     def siguientes_posibles(self):
-        """Estados a los que puede pasar una cita desde este. El flujo es fijo por tipo:
-
-        Inicio → primer estado de Proceso (Confirmada) → otros estados de Proceso → Completado.
-        Cancelado está disponible desde cualquier estado que no sea final.
-        """
-        activos = EstadoCita.objects.filter(activo=True)
-        procesos = activos.filter(tipo=self.TIPO_PROCESO)
-        primer_proceso = procesos.first()
-        codigo_primer_proceso = primer_proceso.codigo if primer_proceso else None
-
-        if self.tipo == self.TIPO_INICIO:
-            codigos = [codigo_primer_proceso] if primer_proceso else []
-        elif self.tipo == self.TIPO_PROCESO:
-            codigos = list(
-                procesos.exclude(codigo=self.codigo)
-                .exclude(codigo=codigo_primer_proceso)
-                .values_list('codigo', flat=True)
-            )
-            if self.codigo != codigo_primer_proceso:
-                codigos += list(activos.filter(tipo=self.TIPO_COMPLETADO).values_list('codigo', flat=True))
-        else:
+        """Estados a los que puede pasar una cita desde este: los que el admin marcó
+        en el catálogo (transiciones) y que estén activos. Un estado final no tiene salida."""
+        if self.es_final:
             return EstadoCita.objects.none()
-
-        codigos += list(activos.filter(tipo=self.TIPO_CANCELADO).values_list('codigo', flat=True))
         # en el desplegable van primero los de proceso, después finalizar y al final cancelar
-        return activos.filter(codigo__in=codigos).order_by(
+        return self.transiciones.filter(activo=True).order_by(
             Case(
                 When(tipo=self.TIPO_PROCESO, then=0),
                 When(tipo=self.TIPO_COMPLETADO, then=1),
@@ -232,3 +217,60 @@ class CalificacionCita(models.Model):
     def estrellas(self):
         """Puntuación en estrellas para mostrar, p. ej. ★★★☆☆."""
         return '★' * self.puntuacion + '☆' * (self.PUNTUACION_MAX - self.puntuacion)
+
+
+class EnvioCorreo(models.Model):
+    """HU031: constancia de cada correo de cita; los fallidos se pueden reintentar."""
+
+    TIPO_AGENDADA   = 'agendada'
+    TIPO_CONFIRMADA = 'confirmada'
+    TIPO_REAGENDADA = 'reagendada'
+    TIPO_CANCELADA  = 'cancelada'
+    TIPO_COMPLETADA = 'completada'
+    TIPOS = [
+        (TIPO_AGENDADA,   'Cita agendada'),
+        (TIPO_CONFIRMADA, 'Cita confirmada'),
+        (TIPO_REAGENDADA, 'Cita reagendada'),
+        (TIPO_CANCELADA,  'Cita cancelada'),
+        (TIPO_COMPLETADA, 'Cita completada (con ticket)'),
+    ]
+
+    ESTADO_ENVIADO = 'enviado'
+    ESTADO_FALLIDO = 'fallido'
+    ESTADOS = [(ESTADO_ENVIADO, 'Enviado'), (ESTADO_FALLIDO, 'Fallido')]
+
+    cita         = models.ForeignKey(Cita, on_delete=models.CASCADE, related_name='envios_correo')
+    tipo         = models.CharField(max_length=20, choices=TIPOS)
+    destinatario = models.CharField(max_length=254, blank=True)
+    asunto       = models.CharField(max_length=200)
+    estado       = models.CharField(max_length=10, choices=ESTADOS)
+    error        = models.CharField(max_length=255, blank=True)
+    intentos     = models.PositiveSmallIntegerField(default=1)
+    # solo para el correo de cita reagendada: permiten volver a armarlo
+    fecha_anterior = models.DateField(null=True, blank=True)
+    hora_anterior  = models.TimeField(null=True, blank=True)
+    fecha_creacion       = models.DateTimeField(auto_now_add=True)
+    fecha_ultimo_intento = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-fecha_creacion']
+        verbose_name = 'Envío de correo'
+        verbose_name_plural = 'Envíos de correo'
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} — Cita #{self.cita_id} — {self.get_estado_display()}'
+
+    def puede_reintentarse(self):
+        """Solo los fallidos, y mientras la cita siga en la etapa que anuncia el correo."""
+        if self.estado != self.ESTADO_FALLIDO:
+            return False
+        tipo_estado = self.cita.estado.tipo
+        if self.tipo == self.TIPO_AGENDADA:
+            return tipo_estado == EstadoCita.TIPO_INICIO
+        if self.tipo == self.TIPO_CONFIRMADA:
+            return tipo_estado == EstadoCita.TIPO_PROCESO
+        if self.tipo == self.TIPO_REAGENDADA:
+            return not self.cita.estado.es_final
+        if self.tipo == self.TIPO_CANCELADA:
+            return tipo_estado == EstadoCita.TIPO_CANCELADO
+        return tipo_estado == EstadoCita.TIPO_COMPLETADO
