@@ -79,8 +79,11 @@ def registro_cliente(request):
         )
         cliente.set_password(contrasena)
         cliente.save()
-        messages.success(request, 'Cuenta creada correctamente. Ya podés iniciar sesión.')
-        return redirect('usuarios:login')
+        # HU003-CP006: el registro deja la sesión iniciada y lleva directo a Mis citas.
+        # Se indica el backend porque el proyecto tiene más de uno configurado.
+        login(request, cliente, backend='apps.usuarios.backends.DUIorEmailBackend')
+        messages.success(request, f'¡Bienvenido {cliente.nombre_completo}! Tu cuenta fue creada correctamente.')
+        return redirect('citas:mis_citas')
     return render(request, 'usuarios/registro_cliente.html', {'errores': {}, 'datos': {}})
 
 

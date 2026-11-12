@@ -9,7 +9,7 @@
 <div class="mt-3 mb-4 d-flex align-items-center gap-3">
     <h2 class="mb-0">Cita #{{ cita.id }}</h2>
     <span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">
-        {{ cita.estado.nombre }}
+        {{ cita.estado_display }}
     </span>
 </div>
 
@@ -232,6 +232,24 @@
                 <a href="{% url 'citas:calendario' %}" class="btn btn-outline-dark">Cancelar</a>
                 <button type="submit" class="btn btn-dark">Guardar cambio</button>
             </div>
+        </form>
+        {% endif %}
+
+        {# HU019-CP008: rechazar una cita pendiente con motivo obligatorio #}
+        {% if puede_rechazar %}
+        <hr class="my-4">
+        <p class="eyebrow mb-3">RECHAZAR CITA</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="rechazar_cita">
+            <div class="row mb-3 align-items-start">
+                <label for="motivo_rechazo" class="col-sm-3 col-form-label">Motivo</label>
+                <div class="col-sm-9">
+                    <textarea id="motivo_rechazo" name="motivo_rechazo" rows="2" class="form-control"
+                              placeholder="Obligatorio: el cliente verá este motivo"></textarea>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-outline-danger">Rechazar</button>
         </form>
         {% endif %}
     </div>

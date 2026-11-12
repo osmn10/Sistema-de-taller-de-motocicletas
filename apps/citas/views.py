@@ -681,6 +681,10 @@ def cita_admin_detalle(request, cita_id):
     opciones_estado_genericas = estados_posibles.exclude(tipo=EstadoCita.TIPO_COMPLETADO)
     productos_disponibles = Producto.objects.filter(activo=True).order_by('nombre')
 
+    # HU019-CP008: solo se rechaza una cita pendiente y si el flujo permite pasar al estado cancelado
+    estado_cancelado = estados_posibles.filter(tipo=EstadoCita.TIPO_CANCELADO).first()
+    puede_rechazar = cita.estado.tipo == EstadoCita.TIPO_INICIO and estado_cancelado is not None
+
     if request.method == 'POST':
         accion = request.POST.get('accion', '').strip()
 
@@ -759,6 +763,37 @@ def cita_admin_detalle(request, cita_id):
                     )
 
             messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado.nombre}.')
+            return redirect('citas:calendario')
+
+        elif accion == 'rechazar_cita':
+            # HU019-CP008: solo una cita pendiente (estado de tipo Inicio) puede rechazarse,
+            # y siempre con motivo. El cliente ve el estado "Rechazada" y el motivo.
+            motivo = request.POST.get('motivo_rechazo', '').strip()
+
+            if not puede_rechazar:
+                messages.error(request, 'Esta cita no se puede rechazar desde su estado actual.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            if not motivo:
+                messages.error(request, 'El motivo es obligatorio para rechazar la cita.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            with transaction.atomic():
+                CambioEstadoCita.objects.create(
+                    cita=cita,
+                    estado_anterior=cita.estado,
+                    estado_nuevo=estado_cancelado,
+                    motivo=f'{Cita.PREFIJO_RECHAZO}{motivo}',
+                    realizado_por=request.user,
+                )
+                cita.estado = estado_cancelado
+                cita.save(update_fields=['estado'])
+
+                transaction.on_commit(
+                    lambda cita_id=cita.id: notificar_cita_cancelada(cita_id)
+                )
+
+            messages.success(request, f'Cita #{cita.id} rechazada.')
             return redirect('citas:calendario')
 
         elif accion == 'finalizar_servicio':
@@ -877,6 +912,7 @@ def cita_admin_detalle(request, cita_id):
         'puede_asignar_mecanico': puede_asignar_mecanico,
         'opciones_estado': opciones_estado_genericas,
         'puede_finalizar': puede_finalizar,
+        'puede_rechazar': puede_rechazar,
         'productos_disponibles': productos_disponibles,
         'repuestos_usados': cita.repuestos_usados.select_related('producto').all(),
         'detalle_economico': calcular_detalle_cita(cita),

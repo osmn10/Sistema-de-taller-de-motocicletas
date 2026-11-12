@@ -3,6 +3,7 @@
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Case, IntegerField, When
+from django.utils.functional import cached_property
 
 from apps.usuarios.models import Cliente, Mecanico
 from apps.vehiculos.models import Motocicleta
@@ -144,6 +145,35 @@ class Cita(models.Model):
     def puede_calificarse(self):
         """V2SCRUM-42: solo citas completadas y sin calificación previa."""
         return self.estado.tipo == EstadoCita.TIPO_COMPLETADO and not hasattr(self, 'calificacion')
+
+    # HU019-CP008: el rechazo usa el estado de tipo cancelado (solo puede existir uno),
+    # así que se distingue de una cancelación por este prefijo en el motivo del historial.
+    PREFIJO_RECHAZO = 'Rechazada por el taller: '
+
+    @cached_property
+    def cambio_cancelacion(self):
+        """Último cambio que dejó la cita en su estado cancelado actual, o None."""
+        if self.estado.tipo != EstadoCita.TIPO_CANCELADO:
+            return None
+        return self.cambios_estado.filter(estado_nuevo=self.estado).order_by('-fecha_cambio').first()
+
+    @property
+    def fue_rechazada(self):
+        cambio = self.cambio_cancelacion
+        return bool(cambio and cambio.motivo.startswith(self.PREFIJO_RECHAZO))
+
+    @property
+    def estado_display(self):
+        """Nombre del estado para mostrar: 'Rechazada' si el taller la rechazó."""
+        return 'Rechazada' if self.fue_rechazada else self.estado.nombre
+
+    @property
+    def motivo_cancelacion(self):
+        """Motivo que escribió el administrador al cancelar o rechazar (sin el prefijo)."""
+        cambio = self.cambio_cancelacion
+        if not cambio:
+            return ''
+        return cambio.motivo.removeprefix(self.PREFIJO_RECHAZO)
 
 
 class ServicioCita(models.Model):

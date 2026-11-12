@@ -39,6 +39,14 @@ def catalogo_servicios(request):
 
             if not datos['nombre']:
                 errores['nombre'] = 'El nombre es obligatorio.'
+            else:
+                # HU018-CP003: no pueden existir dos servicios con el mismo nombre
+                # (sin distinguir mayúsculas). Al editar se excluye el propio servicio.
+                repetido = Servicio.objects.filter(nombre__iexact=datos['nombre'])
+                if servicio_id:
+                    repetido = repetido.exclude(id=servicio_id)
+                if repetido.exists():
+                    errores['nombre'] = 'Ya existe un servicio con ese nombre.'
 
             try:
                 precio = float(datos['precio_base'])
