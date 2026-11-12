@@ -1,0 +1,101 @@
+{% extends 'core/base.html' %}
+{# HU008: el admin registra un cliente. El DUI va sin máscara para que el servidor valide lo que se escribe. #}
+
+{% block title %}Registrar cliente · Taller{% endblock %}
+
+{% block content %}
+<p class="mb-2">
+    <a href="{% url 'usuarios:clientes_lista' %}" class="text-decoration-none">&larr; Volver a clientes</a>
+</p>
+
+<h1 class="h3 mb-2">Registrar cliente</h1>
+<p class="text-muted mb-4">La cuenta se crea sin contraseña. El cliente la crea con el enlace que recibe en su correo al intentar iniciar sesión.</p>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="row mb-3">
+        <label for="nombre" class="col-sm-3 col-form-label">Nombre</label>
+        <div class="col-sm-9">
+            <input type="text" id="nombre" name="nombre" maxlength="100"
+                   class="form-control {% if errores.nombre %}is-invalid{% endif %}"
+                   value="{{ datos.nombre }}">
+            {% if errores.nombre %}
+                <div class="invalid-feedback">{{ errores.nombre }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="apellido" class="col-sm-3 col-form-label">Apellido</label>
+        <div class="col-sm-9">
+            <input type="text" id="apellido" name="apellido" maxlength="100"
+                   class="form-control {% if errores.apellido %}is-invalid{% endif %}"
+                   value="{{ datos.apellido }}">
+            {% if errores.apellido %}
+                <div class="invalid-feedback">{{ errores.apellido }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="dui" class="col-sm-3 col-form-label">DUI</label>
+        <div class="col-sm-9">
+            <input type="text" id="dui" name="dui" maxlength="10"
+                   class="form-control {% if errores.dui %}is-invalid{% endif %}"
+                   value="{{ datos.dui }}"
+                   placeholder="00000000-0">
+            {% if errores.dui %}
+                <div class="invalid-feedback">{{ errores.dui }}</div>
+            {% else %}
+                <small class="text-muted">Escribilo con guion: 00000000-0.</small>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="telefono" class="col-sm-3 col-form-label">Teléfono</label>
+        <div class="col-sm-9">
+            <input type="text" id="telefono" name="telefono"
+                   class="form-control {% if errores.telefono %}is-invalid{% endif %}"
+                   value="{{ datos.telefono }}"
+                   placeholder="0000-0000"
+                   maxlength="9"
+                   data-mask="telefono"
+                   inputmode="numeric">
+            {% if errores.telefono %}
+                <div class="invalid-feedback">{{ errores.telefono }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="email" class="col-sm-3 col-form-label">Correo</label>
+        <div class="col-sm-9">
+            <input type="email" id="email" name="email" maxlength="254"
+                   class="form-control {% if errores.email %}is-invalid{% endif %}"
+                   value="{{ datos.email }}">
+            {% if errores.email %}
+                <div class="invalid-feedback">{{ errores.email }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="direccion" class="col-sm-3 col-form-label">Dirección</label>
+        <div class="col-sm-9">
+            <input type="text" id="direccion" name="direccion" maxlength="255"
+                   class="form-control {% if errores.direccion %}is-invalid{% endif %}"
+                   value="{{ datos.direccion }}">
+            {% if errores.direccion %}
+                <div class="invalid-feedback">{{ errores.direccion }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'usuarios:clientes_lista' %}" class="btn btn-outline-dark">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Guardar</button>
+    </div>
+</form>
+{% endblock %}

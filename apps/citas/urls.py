@@ -22,4 +22,7 @@ urlpatterns = [
     path('estados/', views.estados_cita, name='estados_cita'),
     path('reporte/', views.reporte_servicios, name='reporte_servicios'),
     path('calificaciones/', views.calificaciones, name='calificaciones'),
+    # HU031: correos de cita fallidos y su reintento
+    path('envios-correo/', views.envios_correo, name='envios_correo'),
+    path('envios-correo/<int:envio_id>/reintentar/', views.reintentar_envio_correo, name='reintentar_envio_correo'),
 ]

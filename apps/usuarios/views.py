@@ -8,6 +8,8 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.db import connection, transaction
 from django.db.models import Q
 from django.http import HttpResponse
@@ -17,6 +19,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views import View
 
+from apps.citas.models import EstadoCita
 from apps.core.emails import enviar_correo_html
 
 from .exportacion import generar_excel_clientes_vehiculos
@@ -79,8 +82,11 @@ def registro_cliente(request):
         )
         cliente.set_password(contrasena)
         cliente.save()
-        messages.success(request, 'Cuenta creada correctamente. Ya podés iniciar sesión.')
-        return redirect('usuarios:login')
+        # HU003-CP006: el registro deja la sesión iniciada y lleva directo a Mis citas.
+        # Se indica el backend porque el proyecto tiene más de uno configurado.
+        login(request, cliente, backend='apps.usuarios.backends.DUIorEmailBackend')
+        messages.success(request, f'¡Bienvenido {cliente.nombre_completo}! Tu cuenta fue creada correctamente.')
+        return redirect('citas:mis_citas')
     return render(request, 'usuarios/registro_cliente.html', {'errores': {}, 'datos': {}})
 
 
@@ -95,6 +101,27 @@ class LoginView(View):
     def post(self, request):
         identifier = request.POST.get('identifier', '').strip()
         password = request.POST.get('password', '')
+
+        # Cliente registrado por el administrador: todavía no tiene contraseña.
+        # Se le envía un enlace al correo para que la cree él mismo.
+        if identifier:
+            cuenta = (
+                Usuario.objects
+                .filter(Q(dui=identifier) | Q(email__iexact=identifier))
+                .filter(activo=True)
+                .first()
+            )
+            if cuenta and not cuenta.has_usable_password():
+                # como máximo un correo por minuto para la misma cuenta
+                if cache.add(f'crear-contrasena-{cuenta.pk}', True, 60):
+                    if not _enviar_correo_crear_contrasena(request, cuenta):
+                        cache.delete(f'crear-contrasena-{cuenta.pk}')
+                        return render(request, 'usuarios/login.html', {
+                            'error': 'No pudimos enviarte el correo para crear tu contraseña. Intentá de nuevo en unos minutos.'
+                        })
+                return render(request, 'usuarios/login.html', {
+                    'aviso': 'Tu cuenta todavía no tiene contraseña. Te enviamos un enlace a tu correo para crearla.'
+                })
 
         if not identifier or not password:
             return render(request, 'usuarios/login.html', {
@@ -144,6 +171,23 @@ def _enviar_correo_recuperacion(request, usuario):
     enviar_correo_html(
         asunto=f'Recuperación de contraseña - {settings.TALLER_NOMBRE}',
         plantilla='emails/usuarios/password_reset.html',
+        contexto={'usuario': usuario, 'enlace': enlace},
+        destinatarios=[usuario.email],
+    )
+
+
+def _enviar_correo_crear_contrasena(request, usuario):
+    """Envía el enlace para que un cliente registrado por el administrador cree su contraseña."""
+    uid = urlsafe_base64_encode(force_bytes(usuario.pk))
+    token = default_token_generator.make_token(usuario)
+    ruta = reverse(
+        'usuarios:password_reset_confirmar',
+        kwargs={'uidb64': uid, 'token': token},
+    )
+    enlace = request.build_absolute_uri(ruta)
+    return enviar_correo_html(
+        asunto=f'Creá tu contraseña - {settings.TALLER_NOMBRE}',
+        plantilla='emails/usuarios/crear_contrasena.html',
         contexto={'usuario': usuario, 'enlace': enlace},
         destinatarios=[usuario.email],
     )
@@ -666,7 +710,7 @@ def clientes_lista(request):
 
     # `q` es opcional: si no viene, lista todo
     q = request.GET.get('q', '').strip()
-    clientes = Cliente.objects.all().order_by('apellido', 'nombre')
+    clientes = Cliente.objects.all().order_by('apellido', 'nombre', 'dui')
     if q:
         # `icontains` = LIKE case-insensitive; Q permite combinar con OR (uno cualquiera coincide)
         clientes = clientes.filter(
@@ -676,11 +720,94 @@ def clientes_lista(request):
             Q(email__icontains=q)
         )
 
+    # HU008: 5 clientes por página; get_page tolera páginas inválidas o fuera de rango
+    paginador = Paginator(clientes, 5)
+    pagina = paginador.get_page(request.GET.get('page'))
+
     return render(request, 'usuarios/clientes_lista.html', {
-        'clientes': clientes,
+        'pagina': pagina,
         'q': q,
-        'total': clientes.count(),
+        'total': paginador.count,
     })
+
+
+@login_required(login_url='usuarios:login')
+def cliente_registrar(request):
+    """HU008. El administrador registra un cliente. La cuenta se crea sin contraseña:
+    el cliente la crea con el enlace que recibe al intentar iniciar sesión."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        errores = {}
+        datos = {
+            'nombre':    request.POST.get('nombre', '').strip(),
+            'apellido':  request.POST.get('apellido', '').strip(),
+            'dui':       request.POST.get('dui', '').strip(),
+            'telefono':  request.POST.get('telefono', '').strip(),
+            'email':     request.POST.get('email', '').strip(),
+            'direccion': request.POST.get('direccion', '').strip(),
+        }
+
+        # 1. datos obligatorios y formatos
+        if not datos['nombre']:
+            errores['nombre'] = 'El nombre es obligatorio.'
+        if not datos['apellido']:
+            errores['apellido'] = 'El apellido es obligatorio.'
+        try:
+            dui_validator(datos['dui'])
+        except Exception:
+            errores['dui'] = 'El formato del DUI no es válido. Debe ser 00000000-0.'
+        try:
+            telefono_validator(datos['telefono'])
+        except Exception:
+            errores['telefono'] = 'Formato inválido. Debe ser 0000-0000.'
+        if not re.match(r'^[^@]+@[^@]+\.[^@]+$', datos['email']):
+            errores['email'] = 'El correo no es válido.'
+        if not datos['direccion']:
+            errores['direccion'] = 'La dirección es obligatoria.'
+
+        # 2. DUI repetido, solo si los formatos están bien
+        if not errores:
+            if Cliente.objects.filter(dui=datos['dui']).exists():
+                errores['dui'] = 'Ya existe un cliente con ese DUI.'
+            elif Usuario.objects.filter(dui=datos['dui']).exists():
+                errores['dui'] = 'Ya existe un usuario con ese DUI.'
+
+        # 3. correo repetido, solo si el DUI está libre
+        if not errores:
+            if Cliente.objects.filter(email__iexact=datos['email']).exists():
+                errores['email'] = 'Ya existe un cliente con ese correo.'
+            elif Usuario.objects.filter(email__iexact=datos['email']).exists():
+                errores['email'] = 'Ya existe un usuario con ese correo.'
+
+        if errores:
+            return render(request, 'usuarios/cliente_registrar.html', {
+                'errores': errores,
+                'datos': datos,
+            })
+
+        cliente = Cliente(
+            dui=datos['dui'],
+            nombre=datos['nombre'],
+            apellido=datos['apellido'],
+            telefono=datos['telefono'],
+            # en minúsculas para que el login lo reconozca como sea que lo escriba el cliente
+            email=datos['email'].lower(),
+            direccion=datos['direccion'],
+            activo=True,
+        )
+        cliente.set_unusable_password()
+        cliente.save()
+        messages.success(
+            request,
+            f'Cliente {cliente.nombre_completo} registrado. Para entrar deberá crear '
+            f'su contraseña desde el inicio de sesión.',
+        )
+        return redirect(f"{reverse('usuarios:clientes_lista')}?q={cliente.dui}")
+
+    return render(request, 'usuarios/cliente_registrar.html', {'errores': {}, 'datos': {}})
 
 
 @login_required(login_url='usuarios:login')
@@ -796,6 +923,20 @@ def cliente_toggle(request, dui):
         return redirect('usuarios:cliente_detalle', dui=dui)
 
     cliente = get_object_or_404(Cliente, dui=dui)
+
+    # HU008: no se desactiva un cliente con citas pendientes, confirmadas o en proceso
+    if cliente.activo:
+        citas_activas = cliente.citas.filter(
+            estado__tipo__in=[EstadoCita.TIPO_INICIO, EstadoCita.TIPO_PROCESO],
+        ).count()
+        if citas_activas:
+            messages.error(
+                request,
+                'No se puede desactivar: el cliente tiene citas activas (pendientes, '
+                'confirmadas o en proceso). Finalizalas o cancelalas primero.',
+            )
+            return redirect('usuarios:cliente_detalle', dui=cliente.dui)
+
     cliente.activo = not cliente.activo
     cliente.save()
     estado = 'activado' if cliente.activo else 'desactivado'

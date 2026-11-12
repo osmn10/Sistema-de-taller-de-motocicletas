@@ -9,6 +9,9 @@ app_name = 'vehiculos'
 urlpatterns = [
     path('', views.mis_motos, name='mis_motos'),
     path('nueva/', views.moto_crear, name='moto_crear'),
+    # HU015: vistas del administrador
+    path('lista/', views.motos_lista, name='motos_lista'),
+    path('cliente/<str:dui>/nueva/', views.moto_crear_admin, name='moto_crear_admin'),
     path('<str:placa>/editar/', views.moto_editar, name='moto_editar'),
     path('<str:placa>/toggle/', views.moto_toggle, name='moto_toggle'),
     path('<str:placa>/historial/', views.historial_moto, name='historial_moto'),

@@ -1,0 +1,83 @@
+{% extends 'core/base.html' %}
+{# HU031: correos de cita registrados; los fallidos se pueden reintentar. #}
+
+{% block title %}Envíos de correo · Taller{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1">Envíos de correo</h1>
+<p class="text-muted mb-1">Correos de cita que el sistema intentó enviar. Los fallidos quedan registrados acá para reintentarlos.</p>
+{% if total_fallidos %}
+<p class="text-warning small mb-4">Hay {{ total_fallidos }} envío{{ total_fallidos|pluralize }} fallido{{ total_fallidos|pluralize }}.</p>
+{% else %}
+<div class="mb-4"></div>
+{% endif %}
+
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-4">
+        <select name="estado" class="form-select">
+            <option value="fallido" {% if estado == 'fallido' %}selected{% endif %}>Fallidos</option>
+            <option value="enviado" {% if estado == 'enviado' %}selected{% endif %}>Enviados</option>
+            <option value="todos" {% if estado == 'todos' %}selected{% endif %}>Todos</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-dark w-100">Aplicar</button>
+    </div>
+</form>
+
+{% if envios %}
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Registrado</th>
+                <th>Cita</th>
+                <th>Cliente</th>
+                <th>Correo</th>
+                <th>Destinatario</th>
+                <th>Estado</th>
+                <th>Intentos</th>
+                <th>Último intento</th>
+                <th>Detalle</th>
+                <th class="text-end">Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for envio in envios %}
+            <tr>
+                <td class="small">{{ envio.fecha_creacion|date:'d/m/Y H:i' }}</td>
+                <td><a href="{% url 'citas:cita_admin_detalle' envio.cita_id %}" class="text-decoration-none">#{{ envio.cita_id }}</a></td>
+                <td>{{ envio.cita.cliente.nombre }} {{ envio.cita.cliente.apellido }}</td>
+                <td>{{ envio.get_tipo_display }}</td>
+                <td class="small">{{ envio.destinatario }}</td>
+                <td>
+                    <span class="badge rounded-pill status-badge {% if envio.estado == 'enviado' %}status-on{% else %}status-off{% endif %} px-3 py-2">{{ envio.get_estado_display }}</span>
+                </td>
+                <td>{{ envio.intentos }}</td>
+                <td class="small">{{ envio.fecha_ultimo_intento|date:'d/m/Y H:i' }}</td>
+                <td class="small">{{ envio.error|default:'—' }}</td>
+                <td class="text-end">
+                    {% if envio.puede_reintentarse %}
+                    <form method="post" action="{% url 'citas:reintentar_envio_correo' envio.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-dark">Reintentar</button>
+                    </form>
+                    {% elif envio.estado == 'fallido' %}
+                    <span class="small text-muted">Ya no aplica (cita {{ envio.cita.estado.nombre }})</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center text-muted">
+        {% if estado == 'fallido' %}No hay envíos fallidos.{% else %}No hay envíos registrados con este filtro.{% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
