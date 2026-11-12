@@ -811,6 +811,63 @@ class EstadosCitaTests(TestCase):
         self.assertRedirects(respuesta, reverse('core:home'), fetch_redirect_response=False)
         self.assertFalse(EstadoCita.objects.filter(nombre='Intruso').exists())
 
+    # --- HU019-CP008: rechazar cita con motivo ---
+
+    def rechazar(self, cita, motivo=''):
+        return self.client.post(
+            reverse('citas:cita_admin_detalle', args=[cita.id]),
+            {'accion': 'rechazar_cita', 'motivo_rechazo': motivo},
+        )
+
+    def test_cita_pendiente_muestra_boton_rechazar(self):
+        cita = self.crear_cita('pendiente')
+
+        respuesta = self.client.get(reverse('citas:cita_admin_detalle', args=[cita.id]))
+
+        self.assertContains(respuesta, 'name="accion" value="rechazar_cita"')
+
+    def test_rechazar_sin_motivo_no_cambia_la_cita(self):
+        cita = self.crear_cita('pendiente')
+
+        self.rechazar(cita)
+
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado_id, 'pendiente')
+        self.assertFalse(cita.cambios_estado.exists())
+
+    def test_rechazar_con_motivo_y_el_cliente_ve_estado_y_motivo(self):
+        cita = self.crear_cita('pendiente')
+
+        self.rechazar(cita, 'Horario no disponible en el taller')
+
+        cita = Cita.objects.get(id=cita.id)
+        self.assertEqual(cita.estado_id, 'cancelada')
+        self.assertTrue(cita.fue_rechazada)
+        self.assertEqual(cita.motivo_cancelacion, 'Horario no disponible en el taller')
+
+        self.client.force_login(self.cliente)
+        respuesta = self.client.get(reverse('citas:cita_detalle', args=[cita.id]))
+        self.assertContains(respuesta, 'Rechazada')
+        self.assertContains(respuesta, 'Horario no disponible en el taller')
+
+    def test_no_se_puede_rechazar_una_cita_confirmada(self):
+        cita = self.crear_cita('confirmada')
+
+        self.rechazar(cita, 'Motivo cualquiera')
+
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado_id, 'confirmada')
+
+    def test_cliente_ve_el_motivo_de_una_cancelacion_del_admin(self):
+        cita = self.crear_cita('pendiente')
+        self.cambiar_estado(cita, 'cancelada', 'Cliente no puede asistir')
+
+        self.client.force_login(self.cliente)
+        respuesta = self.client.get(reverse('citas:cita_detalle', args=[cita.id]))
+
+        self.assertContains(respuesta, 'MOTIVO DE LA CANCELACIÓN')
+        self.assertContains(respuesta, 'Cliente no puede asistir')
+
 
 class HorariosPasadosTests(TestCase):
     """No se puede agendar ni reagendar en un horario de hoy que ya empezó."""
