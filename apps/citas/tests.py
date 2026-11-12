@@ -583,7 +583,7 @@ class TicketYCorreoCierreTests(TestCase):
 
 
 class EstadosCitaTests(TestCase):
-    """Catálogo configurable de estados de cita: CRUD del admin y flujo automático por tipo."""
+    """Catálogo configurable de estados de cita: CRUD del admin y transiciones configurables."""
 
     @classmethod
     def setUpTestData(cls):
@@ -767,6 +767,7 @@ class EstadosCitaTests(TestCase):
     def test_editar_cambia_el_nombre_y_conserva_el_codigo(self):
         self.client.post(self.url, {
             'accion': 'guardar', 'codigo': 'en_proceso', 'nombre': 'En reparación', 'tipo': 'proceso',
+            'transiciones': ['completada', 'cancelada'],
         })
 
         estado = EstadoCita.objects.get(codigo='en_proceso')

@@ -50,6 +50,10 @@
                 </select>
                 <button type="submit" class="btn btn-sm btn-dark">{% if cita.mecanico %}Reasignar{% else %}Asignar{% endif %}</button>
             </form>
+            {% elif cita.estado.es_final %}
+            <p class="small text-muted mb-0">No se puede cambiar el mecánico porque la cita está finalizada.</p>
+            {% else %}
+            <p class="small text-muted mb-0">No se puede cambiar el mecánico porque la cita ya inició.</p>
             {% endif %}
         </div>
 
@@ -271,6 +275,29 @@
         </div>
         {% empty %}
         <p class="text-muted small">Sin cambios registrados.</p>
+        {% endfor %}
+
+        {# HU031: correos que el sistema intentó enviar al cliente por esta cita #}
+        <p class="eyebrow mb-3 mt-4">CORREOS DE LA CITA</p>
+        {% for envio in envios_correo %}
+        <div class="border rounded p-3 mb-2">
+            <p class="small mb-1 d-flex justify-content-between align-items-center">
+                <strong>{{ envio.get_tipo_display }}</strong>
+                <span class="badge rounded-pill status-badge {% if envio.estado == 'enviado' %}status-on{% else %}status-off{% endif %} px-3 py-2">{{ envio.get_estado_display }}</span>
+            </p>
+            <p class="small text-muted mb-1">
+                {{ envio.fecha_ultimo_intento|date:"j N Y H:i" }} — {{ envio.destinatario }} · {{ envio.intentos }} intento{{ envio.intentos|pluralize }}
+            </p>
+            {% if envio.puede_reintentarse %}
+            <form method="post" action="{% url 'citas:reintentar_envio_correo' envio.id %}" class="mt-2">
+                {% csrf_token %}
+                <input type="hidden" name="volver" value="cita">
+                <button type="submit" class="btn btn-sm btn-dark">Reintentar</button>
+            </form>
+            {% endif %}
+        </div>
+        {% empty %}
+        <p class="text-muted small">Sin correos registrados.</p>
         {% endfor %}
     </div>
 </div>

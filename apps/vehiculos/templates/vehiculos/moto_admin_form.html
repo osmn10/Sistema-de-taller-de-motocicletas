@@ -1,0 +1,105 @@
+{% extends 'core/base.html' %}
+{# HU015: el administrador registra una moto a nombre de un cliente. #}
+
+{% block title %}Registrar moto · Taller{% endblock %}
+
+{% block content %}
+<p class="mb-2">
+    <a href="{% url 'usuarios:cliente_detalle' dui=cliente.dui %}" class="text-decoration-none">&larr; Volver al cliente</a>
+</p>
+
+<h1 class="h3 mb-1">Registrar nueva motocicleta</h1>
+<p class="text-muted mb-4">Cliente: {{ cliente.nombre_completo }} · DUI {{ cliente.dui }}</p>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="row mb-3">
+        <label for="placa" class="col-sm-3 col-form-label">Placa</label>
+        <div class="col-sm-9">
+            <input type="text" id="placa" name="placa"
+                   class="form-control {% if errores.placa %}is-invalid{% endif %}"
+                   value="{{ datos.placa }}"
+                   placeholder="Ej. M-1234"
+                   maxlength="6"
+                   data-mask="placa">
+            <div class="form-text">Una letra seguida de 4 números. El guión se agrega automáticamente.</div>
+            {% if errores.placa %}
+                <div class="invalid-feedback">{{ errores.placa }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="marca" class="col-sm-3 col-form-label">Marca</label>
+        <div class="col-sm-9">
+            <input type="text" id="marca" name="marca" maxlength="50"
+                   class="form-control {% if errores.marca %}is-invalid{% endif %}"
+                   value="{{ datos.marca }}"
+                   placeholder="Yamaha, Honda, Suzuki...">
+            {% if errores.marca %}
+                <div class="invalid-feedback">{{ errores.marca }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="modelo" class="col-sm-3 col-form-label">Modelo</label>
+        <div class="col-sm-9">
+            <input type="text" id="modelo" name="modelo" maxlength="50"
+                   class="form-control {% if errores.modelo %}is-invalid{% endif %}"
+                   value="{{ datos.modelo }}"
+                   placeholder="YBR 125, CG 150...">
+            {% if errores.modelo %}
+                <div class="invalid-feedback">{{ errores.modelo }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="anio" class="col-sm-3 col-form-label">Año</label>
+        <div class="col-sm-9">
+            <input type="number" id="anio" name="anio"
+                   class="form-control {% if errores.anio %}is-invalid{% endif %}"
+                   value="{{ datos.anio }}"
+                   min="1980" max="{{ anio_max }}"
+                   placeholder="2024">
+            {% if errores.anio %}
+                <div class="invalid-feedback">{{ errores.anio }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="color" class="col-sm-3 col-form-label">Color</label>
+        <div class="col-sm-9">
+            <input type="text" id="color" name="color" maxlength="30"
+                   class="form-control {% if errores.color %}is-invalid{% endif %}"
+                   value="{{ datos.color }}"
+                   placeholder="Rojo, negro, azul...">
+            {% if errores.color %}
+                <div class="invalid-feedback">{{ errores.color }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <label for="kilometraje" class="col-sm-3 col-form-label">Kilometraje</label>
+        <div class="col-sm-9">
+            <input type="number" id="kilometraje" name="kilometraje"
+                   class="form-control {% if errores.kilometraje %}is-invalid{% endif %}"
+                   value="{{ datos.kilometraje }}"
+                   min="0"
+                   placeholder="0">
+            {% if errores.kilometraje %}
+                <div class="invalid-feedback">{{ errores.kilometraje }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <a href="{% url 'usuarios:cliente_detalle' dui=cliente.dui %}" class="btn btn-outline-dark">Cancelar</a>
+        <button type="submit" class="btn btn-dark">Registrar moto</button>
+    </div>
+</form>
+{% endblock %}

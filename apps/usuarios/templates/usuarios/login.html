@@ -15,6 +15,9 @@
         {% if error %}
         <div class="alert alert-danger text-start" role="alert">{{ error }}</div>
         {% endif %}
+        {% if aviso %}
+        <div class="alert alert-info text-start" role="alert">{{ aviso }}</div>
+        {% endif %}
 
         <form method="POST" class="text-start">
             {% csrf_token %}
@@ -29,7 +32,7 @@
                 <label for="password" class="form-label">Contraseña</label>
                 <div class="input-group">
                     <input type="password" class="form-control" id="password" name="password"
-                           placeholder="••••••••" autocomplete="current-password" required>
+                           placeholder="••••••••" autocomplete="current-password">
                     {% include "core/_pw_toggle_boton.html" with input_id="password" %}
                 </div>
             </div>

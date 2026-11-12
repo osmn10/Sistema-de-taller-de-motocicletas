@@ -26,7 +26,8 @@ from reportlab.platypus import (
 
 
 def _money(valor):
-    return f'${valor:.2f}' if valor is not None else 'N/D'
+    # coma decimal, igual que la web y los correos ($119,98)
+    return f'${valor:.2f}'.replace('.', ',') if valor is not None else 'N/D'
 
 
 def generar_ticket_pdf(cita, detalle) -> bytes:

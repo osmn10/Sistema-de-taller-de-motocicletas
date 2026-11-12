@@ -43,6 +43,7 @@
                 <th class="text-muted fw-normal small">HORA</th>
                 <th class="text-muted fw-normal small">CLIENTE</th>
                 <th class="text-muted fw-normal small">MOTOCICLETA</th>
+                <th class="text-muted fw-normal small">MECÁNICO</th>
                 <th class="text-muted fw-normal small">ESTADO</th>
                 <th></th>
             </tr>
@@ -53,6 +54,7 @@
                 <td class="mono">{{ cita.hora|time:'H:i' }}</td>
                 <td>{{ cita.cliente.nombre_completo }}</td>
                 <td class="mono">{{ cita.motocicleta.placa }}</td>
+                <td>{% if cita.mecanico %}{{ cita.mecanico.nombre_completo }}{% else %}<span class="text-muted">Sin asignar</span>{% endif %}</td>
                 <td><span class="badge rounded-pill status-badge status-{{ cita.estado.tipo }} px-3 py-2" style="--sb: {{ cita.estado.color }}; --sb-rgb: {{ cita.estado.color_rgb }};">{{ cita.estado.nombre }}</span></td>
                 <td class="text-end">
                     <a href="{% url 'citas:cita_admin_detalle' cita.id %}" class="btn btn-sm btn-outline-dark">Ver detalle</a>
@@ -77,7 +79,8 @@
             <div class="cal-day {% if dia.es_hoy %}cal-today{% endif %}">{{ dia.fecha|date:'d' }}</div>
             {% for cita in dia.citas %}
             <a href="{% url 'citas:cita_admin_detalle' cita.id %}" class="cal-event text-decoration-none">
-                {{ cita.hora|time:'H:i' }} {{ cita.motocicleta.placa }}
+                {{ cita.hora|time:'H:i' }} {{ cita.motocicleta.placa }}<br>
+                {% if cita.mecanico %}{{ cita.mecanico.nombre_completo }}{% else %}Sin asignar{% endif %}
             </a>
             {% endfor %}
         </div>
@@ -92,7 +95,8 @@
         <div class="cal-day {% if dia.es_hoy %}cal-today{% endif %}">{{ dia.nombre }} {{ dia.fecha|date:'d' }}</div>
         {% for cita in dia.citas %}
         <a href="{% url 'citas:cita_admin_detalle' cita.id %}" class="cal-event text-decoration-none">
-            {{ cita.hora|time:'H:i' }} {{ cita.motocicleta.placa }}
+            {{ cita.hora|time:'H:i' }} {{ cita.motocicleta.placa }}<br>
+            {% if cita.mecanico %}{{ cita.mecanico.nombre_completo }}{% else %}Sin asignar{% endif %}
         </a>
         {% empty %}
         {% if dia.fecha.weekday == 6 %}
