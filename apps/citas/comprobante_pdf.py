@@ -73,7 +73,7 @@ def generar_comprobante_pdf(cita) -> bytes:
     story.append(Paragraph('Servicios solicitados', styles['Heading3']))
     filas_servicios = [['Servicio', 'Precio de referencia']]
     for linea in cita.serviciocita_set.select_related('servicio').all():
-        filas_servicios.append([escape(linea.servicio.nombre), f'${linea.precio_final:.2f}'])
+        filas_servicios.append([escape(linea.servicio.nombre), f'${linea.precio_final:.2f}'.replace('.', ',')])
     if len(filas_servicios) == 1:
         filas_servicios.append(['Sin servicios registrados', ''])
 
