@@ -12,6 +12,14 @@
 <form method="post">
     {% csrf_token %}
 
+    <!-- Campo código -->
+    <div class="mb-3">
+        <label class="form-label">Código</label>
+        <input type="text" class="form-control {% if errores.codigo %}is-invalid{% endif %}"
+               name="codigo" value="{{ producto.codigo }}" placeholder="Ej: PROD-0001">
+        {% if errores.codigo %}<div class="invalid-feedback">{{ errores.codigo }}</div>{% endif %}
+    </div>
+
     <!-- Campo nombre -->
     <div class="mb-3">
         <label class="form-label">Nombre</label>

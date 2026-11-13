@@ -27,6 +27,8 @@ class Proveedor(models.Model):
 class Producto(models.Model):
     """Producto o repuesto del inventario del taller."""
 
+    # Código interno del repuesto (ej: "PROD-001"); opcional para no romper productos ya creados sin código
+    codigo = models.CharField(max_length=50, blank=True, default='')
     # Nombre del producto (ej: "Aceite 10W-40", "Pastilla de freno")
     nombre = models.CharField(max_length=200)
     # Descripción detallada del producto
