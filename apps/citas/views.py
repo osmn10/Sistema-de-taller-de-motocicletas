@@ -19,7 +19,8 @@ from apps.servicios.models import Servicio
 from apps.usuarios.models import Mecanico
 from apps.vehiculos.models import Motocicleta
 
-from .models import CalificacionCita, Cita, CambioEstadoCita, EstadoCita, RepuestoUsado, ServicioCita
+from .comprobante_pdf import generar_comprobante_pdf, numero_comprobante
+from .models import CalificacionCita, Cita, CambioEstadoCita, EnvioCorreo, EstadoCita, RepuestoUsado, ServicioCita
 from .totales import calcular_detalle_cita, precio_valido
 from .reporte_excel import generar_reporte_excel
 from .reporte_pdf import generar_reporte_pdf
@@ -33,6 +34,7 @@ from .services import (
     notificar_cita_completada,
     notificar_cita_confirmada,
     notificar_cita_reagendada,
+    reintentar_envio,
 )
 
 
@@ -102,7 +104,7 @@ def disponibilidad(request):
         return render(request, 'citas/disponibilidad.html', contexto)
 
     if not horario.abierto or not horario.hora_apertura or not horario.hora_cierre:
-        contexto['mensaje'] = f'El taller no atiende los {horario.get_dia_semana_display().lower()}.'
+        contexto['mensaje'] = f'El taller no atiende los días {horario.get_dia_semana_display().lower()}.'
         contexto['fecha'] = fecha
         contexto['servicio'] = servicio
         return render(request, 'citas/disponibilidad.html', contexto)
@@ -257,7 +259,11 @@ def agendar_cita(request):
                 lambda cita_id=cita.id: notificar_cita_agendada(cita_id)
             )
 
-        messages.success(request, f'Cita #{cita.id} agendada para el {fecha} a las {hora.strftime("%H:%M")}.')
+        messages.success(
+            request,
+            f'Cita #{cita.id} agendada para el {fecha.strftime("%d/%m/%Y")} a las {hora.strftime("%H:%M")}. '
+            'Ya podés descargar tu comprobante.',
+        )
         return redirect('citas:cita_detalle', cita_id=cita.id)
 
     return render(request, 'citas/agendar_cita.html', {
@@ -361,6 +367,27 @@ def descargar_ticket(request, cita_id):
     pdf_bytes = generar_ticket_pdf(cita, detalle)
     respuesta = HttpResponse(pdf_bytes, content_type='application/pdf')
     respuesta['Content-Disposition'] = f'attachment; filename="ticket_cita_{cita.id}.pdf"'
+    return respuesta
+
+
+@login_required(login_url='usuarios:login')
+def descargar_comprobante(request, cita_id):
+    """V2SCRUM-36. Descarga del comprobante PDF de una cita agendada.
+
+    Disponible desde que la cita se agenda y en cualquier momento posterior,
+    salvo que la cita esté cancelada (ya no hay reserva que comprobar).
+    """
+    if not request.user.is_cliente:
+        messages.error(request, 'Solo los clientes pueden descargar el comprobante de sus citas.')
+        return redirect('core:home')
+
+    cita = get_object_or_404(Cita, id=cita_id, cliente=request.user.cliente)
+    if cita.estado.tipo == EstadoCita.TIPO_CANCELADO:
+        messages.error(request, 'La cita está cancelada: ya no tiene comprobante de reserva.')
+        return redirect('citas:cita_detalle', cita_id=cita.id)
+
+    respuesta = HttpResponse(generar_comprobante_pdf(cita), content_type='application/pdf')
+    respuesta['Content-Disposition'] = f'attachment; filename="comprobante_{numero_comprobante(cita)}.pdf"'
     return respuesta
 
 
@@ -643,9 +670,15 @@ def cita_admin_detalle(request, cita_id):
     servicios = cita.serviciocita_set.select_related('servicio').all()
     cambios = cita.cambios_estado.select_related('realizado_por', 'estado_anterior', 'estado_nuevo').all()
 
-    # el flujo lo define el tipo de cada estado (ver EstadoCita.siguientes_posibles)
+    # el flujo lo definen las transiciones configuradas en el catálogo (ver EstadoCita.siguientes_posibles)
     estados_posibles = cita.estado.siguientes_posibles()
-    puede_asignar_mecanico = not cita.estado.es_final
+
+    # la cita no ha iniciado si está en el estado de Inicio (Pendiente)
+    # o en el primer estado de Proceso (Confirmada)
+    primer_proceso = EstadoCita.objects.filter(tipo=EstadoCita.TIPO_PROCESO).first()
+    cita_no_iniciada = cita.estado.tipo == EstadoCita.TIPO_INICIO or cita.estado == primer_proceso
+    # el mecánico se cambia solo antes de iniciar; si ya inició, solo se asigna cuando no tiene
+    puede_asignar_mecanico = not cita.estado.es_final and (cita_no_iniciada or cita.mecanico_id is None)
 
     # V2SCRUM-24: pasar a un estado de tipo completado exige registrar repuestos
     # usados y observaciones de cierre, así que esa transición se maneja con su
@@ -655,12 +688,19 @@ def cita_admin_detalle(request, cita_id):
     opciones_estado_genericas = estados_posibles.exclude(tipo=EstadoCita.TIPO_COMPLETADO)
     productos_disponibles = Producto.objects.filter(activo=True).order_by('nombre')
 
+    # HU019-CP008: solo se rechaza una cita pendiente y si el flujo permite pasar al estado cancelado
+    estado_cancelado = estados_posibles.filter(tipo=EstadoCita.TIPO_CANCELADO).first()
+    puede_rechazar = cita.estado.tipo == EstadoCita.TIPO_INICIO and estado_cancelado is not None
+
     if request.method == 'POST':
         accion = request.POST.get('accion', '').strip()
 
         if accion == 'asignar_mecanico':
             if not puede_asignar_mecanico:
-                messages.error(request, 'No se puede asignar mecánico a esta cita.')
+                if cita.estado.es_final:
+                    messages.error(request, 'No se puede asignar mecánico a esta cita.')
+                else:
+                    messages.error(request, 'La cita ya inició: no se puede cambiar el mecánico.')
                 return redirect('citas:cita_admin_detalle', cita_id=cita.id)
             mecanico_dui = request.POST.get('mecanico_dui', '').strip()
             if not mecanico_dui:
@@ -733,6 +773,37 @@ def cita_admin_detalle(request, cita_id):
                     )
 
             messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado.nombre}.')
+            return redirect('citas:calendario')
+
+        elif accion == 'rechazar_cita':
+            # HU019-CP008: solo una cita pendiente (estado de tipo Inicio) puede rechazarse,
+            # y siempre con motivo. El cliente ve el estado "Rechazada" y el motivo.
+            motivo = request.POST.get('motivo_rechazo', '').strip()
+
+            if not puede_rechazar:
+                messages.error(request, 'Esta cita no se puede rechazar desde su estado actual.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            if not motivo:
+                messages.error(request, 'El motivo es obligatorio para rechazar la cita.')
+                return redirect('citas:cita_admin_detalle', cita_id=cita.id)
+
+            with transaction.atomic():
+                CambioEstadoCita.objects.create(
+                    cita=cita,
+                    estado_anterior=cita.estado,
+                    estado_nuevo=estado_cancelado,
+                    motivo=f'{Cita.PREFIJO_RECHAZO}{motivo}',
+                    realizado_por=request.user,
+                )
+                cita.estado = estado_cancelado
+                cita.save(update_fields=['estado'])
+
+                transaction.on_commit(
+                    lambda cita_id=cita.id: notificar_cita_cancelada(cita_id)
+                )
+
+            messages.success(request, f'Cita #{cita.id} rechazada.')
             return redirect('citas:calendario')
 
         elif accion == 'finalizar_servicio':
@@ -851,7 +922,9 @@ def cita_admin_detalle(request, cita_id):
         'puede_asignar_mecanico': puede_asignar_mecanico,
         'opciones_estado': opciones_estado_genericas,
         'puede_finalizar': puede_finalizar,
+        'puede_rechazar': puede_rechazar,
         'productos_disponibles': productos_disponibles,
+        'envios_correo': cita.envios_correo.all(),
         'repuestos_usados': cita.repuestos_usados.select_related('producto').all(),
         'detalle_economico': calcular_detalle_cita(cita),
     })
@@ -904,7 +977,7 @@ def estados_cita(request):
     # de estos tipos el sistema necesita exactamente uno (agendar, finalizar y cancelar dependen de ellos)
     TIPOS_UNICOS = [EstadoCita.TIPO_INICIO, EstadoCita.TIPO_COMPLETADO, EstadoCita.TIPO_CANCELADO]
 
-    estados = EstadoCita.objects.all()
+    estados = EstadoCita.objects.prefetch_related('transiciones')
 
     estado_editar = None
     editar_codigo = request.GET.get('editar')
@@ -950,6 +1023,30 @@ def estados_cita(request):
                         f'({existente.first().nombre}). Solo puede haber uno.'
                     )
 
+            # HU037: al editar, las casillas "Puede pasar a" definen las transiciones
+            transiciones_marcadas = request.POST.getlist('transiciones')
+            destinos = []
+            if estado_editar:
+                es_final = datos['tipo'] in [EstadoCita.TIPO_COMPLETADO, EstadoCita.TIPO_CANCELADO]
+                destinos = list(EstadoCita.objects.filter(codigo__in=transiciones_marcadas))
+                if es_final and transiciones_marcadas:
+                    errores['transiciones'] = 'Un estado final no puede pasar a otro estado.'
+                elif not es_final and not transiciones_marcadas:
+                    errores['transiciones'] = 'Marcá al menos un estado al que pueda pasar una cita desde este.'
+                elif len(destinos) != len(set(transiciones_marcadas)):
+                    errores['transiciones'] = 'Elegiste un estado que no existe.'
+                elif not es_final and not any(d.activo for d in destinos):
+                    errores['transiciones'] = 'Marcá al menos un estado activo, o la cita quedaría sin salida.'
+                elif estado_editar.codigo in transiciones_marcadas:
+                    errores['transiciones'] = 'Un estado no puede pasar a sí mismo.'
+                elif any(d.tipo == EstadoCita.TIPO_INICIO for d in destinos):
+                    errores['transiciones'] = 'Una cita no puede volver al estado de Inicio.'
+                elif datos['tipo'] == EstadoCita.TIPO_INICIO and any(d.tipo == EstadoCita.TIPO_COMPLETADO for d in destinos):
+                    errores['transiciones'] = ('Desde el estado de Inicio no se puede completar la cita: '
+                                               'primero debe pasar por un estado de Proceso.')
+                elif datos['tipo'] == EstadoCita.TIPO_INICIO and not any(d.tipo == EstadoCita.TIPO_PROCESO for d in destinos):
+                    errores['transiciones'] = 'El estado de Inicio debe poder pasar al menos a un estado de Proceso.'
+
             if errores:
                 return render(request, 'citas/estados_cita.html', {
                     'estados': estados,
@@ -959,12 +1056,17 @@ def estados_cita(request):
                     'datos': datos,
                     'estado_editar': estado_editar,
                     'mostrar_form': True,
+                    'candidatos': EstadoCita.objects.exclude(tipo=EstadoCita.TIPO_INICIO).exclude(
+                        codigo=estado_editar.codigo) if estado_editar else [],
+                    'transiciones_marcadas': transiciones_marcadas,
                 })
 
             if estado_editar:
-                estado_editar.nombre = datos['nombre']
-                estado_editar.tipo = datos['tipo']
-                estado_editar.save(update_fields=['nombre', 'tipo'])
+                with transaction.atomic():
+                    estado_editar.nombre = datos['nombre']
+                    estado_editar.tipo = datos['tipo']
+                    estado_editar.save(update_fields=['nombre', 'tipo'])
+                    estado_editar.transiciones.set(destinos)
                 messages.success(request, f'Estado "{estado_editar.nombre}" actualizado.')
             else:
                 # el código se genera del nombre y no cambia nunca (es la PK)
@@ -977,13 +1079,27 @@ def estados_cita(request):
 
                 # el nuevo estado va al final de la lista y toma el color de su tipo
                 ultimo = EstadoCita.objects.order_by('-orden').first()
-                EstadoCita.objects.create(
-                    codigo=codigo,
-                    nombre=datos['nombre'],
-                    tipo=datos['tipo'],
-                    color=EstadoCita.COLORES[datos['tipo']],
-                    orden=ultimo.orden + 1 if ultimo else 1,
-                )
+                with transaction.atomic():
+                    nuevo = EstadoCita.objects.create(
+                        codigo=codigo,
+                        nombre=datos['nombre'],
+                        tipo=datos['tipo'],
+                        color=EstadoCita.COLORES[datos['tipo']],
+                        orden=ultimo.orden + 1 if ultimo else 1,
+                    )
+                    # HU037: un estado de Proceso nuevo entra al flujo con las transiciones
+                    # habituales; el admin las cambia después con Editar
+                    if nuevo.tipo == EstadoCita.TIPO_PROCESO:
+                        otros_procesos = EstadoCita.objects.filter(tipo=EstadoCita.TIPO_PROCESO).exclude(codigo=nuevo.codigo)
+                        primer_proceso = otros_procesos.filter(activo=True).first()
+                        if primer_proceso:
+                            destinos = list(otros_procesos.exclude(codigo=primer_proceso.codigo))
+                        else:
+                            destinos = list(otros_procesos)
+                        destinos += list(EstadoCita.objects.filter(
+                            tipo__in=[EstadoCita.TIPO_COMPLETADO, EstadoCita.TIPO_CANCELADO]))
+                        nuevo.transiciones.set(destinos)
+                        nuevo.origenes.add(*otros_procesos)
                 messages.success(request, f'Estado "{datos["nombre"]}" creado.')
 
             return redirect('citas:estados_cita')
@@ -1017,6 +1133,9 @@ def estados_cita(request):
         'datos': {},
         'estado_editar': estado_editar,
         'mostrar_form': bool(request.GET.get('mostrar_form') or estado_editar),
+        'candidatos': EstadoCita.objects.exclude(tipo=EstadoCita.TIPO_INICIO).exclude(
+            codigo=estado_editar.codigo) if estado_editar else [],
+        'transiciones_marcadas': list(estado_editar.transiciones.values_list('codigo', flat=True)) if estado_editar else [],
     })
 
 
@@ -1098,3 +1217,55 @@ def calificaciones(request):
         'puntuacion': puntuacion,
         'puntuaciones': CalificacionCita.PUNTUACIONES,
     })
+
+
+@login_required(login_url='usuarios:login')
+def envios_correo(request):
+    """HU031. El administrador revisa los correos de cita; por defecto, los fallidos."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+
+    estado = request.GET.get('estado', EnvioCorreo.ESTADO_FALLIDO)
+    envios = EnvioCorreo.objects.select_related('cita__cliente', 'cita__estado')
+    if estado in (EnvioCorreo.ESTADO_FALLIDO, EnvioCorreo.ESTADO_ENVIADO):
+        envios = envios.filter(estado=estado)
+    else:
+        estado = 'todos'
+    # los más recientes primero; con el tope la pantalla no crece sin límite
+    envios = envios[:200]
+
+    return render(request, 'citas/envios_correo.html', {
+        'envios': envios,
+        'estado': estado,
+        'total_fallidos': EnvioCorreo.objects.filter(estado=EnvioCorreo.ESTADO_FALLIDO).count(),
+    })
+
+
+@login_required(login_url='usuarios:login')
+def reintentar_envio_correo(request, envio_id):
+    """HU031. Reenvía un correo fallido con los datos actuales de la cita."""
+    if not request.user.is_admin:
+        messages.error(request, 'No tenés permiso para acceder a esta sección.')
+        return redirect('core:home')
+    if request.method != 'POST':
+        return redirect('citas:envios_correo')
+
+    envio = get_object_or_404(EnvioCorreo.objects.select_related('cita__estado'), id=envio_id)
+    if envio.estado == EnvioCorreo.ESTADO_ENVIADO:
+        messages.info(request, 'Ese correo ya fue enviado; no hace falta reintentarlo.')
+    elif not envio.puede_reintentarse():
+        messages.error(request, f'Ese correo ya no aplica: la cita #{envio.cita_id} ahora está {envio.cita.estado.nombre}.')
+    elif reintentar_envio(envio):
+        messages.success(request, f'Correo de la cita #{envio.cita_id} reenviado a {envio.destinatario}.')
+    else:
+        messages.error(
+            request,
+            f'No se pudo reenviar el correo de la cita #{envio.cita_id}. '
+            f'Sigue registrado como fallido; intentá de nuevo más tarde.',
+        )
+
+    # si se reintentó desde el detalle de la cita, se vuelve ahí
+    if request.POST.get('volver') == 'cita':
+        return redirect('citas:cita_admin_detalle', cita_id=envio.cita_id)
+    return redirect('citas:envios_correo')
