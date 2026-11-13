@@ -33,8 +33,13 @@ def calcular_reporte_servicios(desde, hasta, servicio_id=None, mecanico_dui=None
         citas_activas = citas_activas.filter(mecanico__dui=mecanico_dui)
 
     # Servicios más solicitados: líneas de ServicioCita de las citas activas.
+    # Si se filtró por servicio, el ranking queda acotado a ese servicio
+    # (si no, una cita con varios servicios sumaría también los otros).
+    servicios_top_query = ServicioCita.objects.filter(cita__in=citas_activas)
+    if servicio_id:
+        servicios_top_query = servicios_top_query.filter(servicio__id=servicio_id)
     servicios_top = list(
-        ServicioCita.objects.filter(cita__in=citas_activas)
+        servicios_top_query
         .values('servicio__id', 'servicio__nombre')
         .annotate(cantidad=Count('id'))
         .order_by('-cantidad', 'servicio__nombre')
