@@ -772,6 +772,13 @@ def cita_admin_detalle(request, cita_id):
                         lambda cita_id=cita.id: notificar_cita_confirmada(cita_id)
                     )
 
+                # V2SCRUM-32: al cancelar la cita el administrador, el cliente recibe el correo
+                # de cancelación con el motivo que se escribió (obligatorio para cancelar).
+                if nuevo_estado.tipo == EstadoCita.TIPO_CANCELADO:
+                    transaction.on_commit(
+                        lambda cita_id=cita.id: notificar_cita_cancelada(cita_id)
+                    )
+
             messages.success(request, f'Cita #{cita.id} actualizada a {nuevo_estado.nombre}.')
             return redirect('citas:calendario')
 

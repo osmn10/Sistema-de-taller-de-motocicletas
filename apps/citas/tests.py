@@ -205,6 +205,58 @@ class NotificacionesCitaTests(TestCase):
         self.assertEqual(cita.estado_id, 'cancelada')
         notificar.assert_called_once_with(cita.id)
 
+    def test_admin_cancela_con_motivo_y_el_cliente_recibe_el_correo(self):
+        # V2SCRUM-32: la cancelación hecha por el administrador también avisa al cliente
+        cita = self.crear_cita()
+        self.client.force_login(self.admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            respuesta = self.client.post(
+                reverse('citas:cita_admin_detalle', args=[cita.id]),
+                {
+                    'accion': 'cambiar_estado',
+                    'nuevo_estado': 'cancelada',
+                    'motivo': 'Falta de repuestos',
+                },
+            )
+
+        self.assertEqual(respuesta.status_code, 302)
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado_id, 'cancelada')
+        self.assertEqual(len(mail.outbox), 1)
+        mensaje = mail.outbox[0]
+        self.assertEqual(mensaje.to, ['ana@example.com'])
+        self.assertIn(f'Cita #{cita.id} cancelada', mensaje.subject)
+        contenido_html, _ = mensaje.alternatives[0]
+        self.assertIn('Falta de repuestos', contenido_html)
+
+    def test_admin_cancela_sin_motivo_no_cancela_ni_envia_correo(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse('citas:cita_admin_detalle', args=[cita.id]),
+                {'accion': 'cambiar_estado', 'nuevo_estado': 'cancelada', 'motivo': ''},
+            )
+
+        cita.refresh_from_db()
+        self.assertEqual(cita.estado_id, 'pendiente')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_confirmar_no_envia_correo_de_cancelacion(self):
+        cita = self.crear_cita()
+        self.client.force_login(self.admin)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse('citas:cita_admin_detalle', args=[cita.id]),
+                {'accion': 'cambiar_estado', 'nuevo_estado': 'confirmada', 'motivo': ''},
+            )
+
+        asuntos = [m.subject for m in mail.outbox]
+        self.assertFalse(any('cancelada' in a for a in asuntos))
+
     @patch('apps.citas.views.notificar_cita_reagendada')
     def test_reagendar_dispara_notificacion_despues_de_guardar(self, notificar):
         cita = self.crear_cita()
