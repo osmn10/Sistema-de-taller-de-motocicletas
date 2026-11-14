@@ -14,19 +14,31 @@
         + Nuevo producto
     </button>
 
-    <!-- Formulario de búsqueda por nombre o proveedor -->
-    <form method="get" class="d-flex gap-2">
-        <input type="text" class="form-control" name="q" placeholder="Buscar por nombre o proveedor" value="{{ busqueda }}">
+    <!-- Formulario de búsqueda por código, nombre o proveedor, y filtro de stock bajo -->
+    <form method="get" class="d-flex gap-2 align-items-center">
+        <input type="text" class="form-control" name="q" placeholder="Buscar por código, nombre o proveedor" value="{{ busqueda }}">
+        <div class="form-check text-nowrap">
+            <input type="checkbox" class="form-check-input" id="stockBajo" name="stock_bajo" value="1" {% if solo_stock_bajo %}checked{% endif %}>
+            <label class="form-check-label" for="stockBajo">Solo stock bajo</label>
+        </div>
         <button type="submit" class="btn btn-outline-dark">Buscar</button>
     </form>
 </div>
 
 <!-- Formulario colapsable para crear un nuevo producto -->
-<div class="collapse mb-4" id="formNuevo">
+<div class="collapse mb-4 {% if errores %}show{% endif %}" id="formNuevo">
     <div class="border rounded p-4">
         <p class="eyebrow mb-3">NUEVO PRODUCTO</p>
         <form method="post" action="{% url 'productos:crear_producto' %}">
             {% csrf_token %}
+
+            <!-- Campo código del producto -->
+            <div class="mb-3">
+                <label class="form-label">Código</label>
+                <input type="text" class="form-control {% if errores.codigo %}is-invalid{% endif %}"
+                       name="codigo" value="{{ form_codigo }}" placeholder="Ej: PROD-0001">
+                {% if errores.codigo %}<div class="invalid-feedback">{{ errores.codigo }}</div>{% endif %}
+            </div>
 
             <!-- Campo nombre del producto -->
             <div class="mb-3">
@@ -53,13 +65,15 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Stock actual</label>
-                    <input type="number" class="form-control" name="stock_actual"
-                           value="{{ form_stock_actual }}" placeholder="0">
+                    <input type="number" class="form-control {% if errores.stock_actual %}is-invalid{% endif %}"
+                           name="stock_actual" value="{{ form_stock_actual }}" placeholder="0">
+                    {% if errores.stock_actual %}<div class="invalid-feedback">{{ errores.stock_actual }}</div>{% endif %}
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Stock mínimo</label>
-                    <input type="number" class="form-control" name="stock_minimo"
-                           value="{{ form_stock_minimo }}" placeholder="5">
+                    <input type="number" class="form-control {% if errores.stock_minimo %}is-invalid{% endif %}"
+                           name="stock_minimo" value="{{ form_stock_minimo }}" placeholder="5">
+                    {% if errores.stock_minimo %}<div class="invalid-feedback">{{ errores.stock_minimo }}</div>{% endif %}
                 </div>
             </div>
 
@@ -88,6 +102,7 @@
 <table class="table">
     <thead>
         <tr>
+            <th class="text-muted fw-normal small">CÓDIGO</th>
             <th class="text-muted fw-normal small">NOMBRE</th>
             <th class="text-muted fw-normal small">STOCK</th>
             <th class="text-muted fw-normal small">MÍN.</th>
@@ -99,6 +114,7 @@
     <tbody>
         {% for producto in productos %}
         <tr>
+            <td class="align-middle">{{ producto.codigo|default:"—" }}</td>
             <td class="align-middle">{{ producto.nombre }}</td>
             <!-- Si el stock está bajo, mostrarlo en rojo -->
             <td class="align-middle {% if producto.stock_bajo %}text-danger fw-bold{% endif %}">

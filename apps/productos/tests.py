@@ -103,8 +103,9 @@ class ProveedoresTests(TestCase):
     def test_un_proveedor_tiene_varios_productos(self):
         proveedor = Proveedor.objects.create(nombre='MotoPartes')
 
-        for nombre in ['Bujía', 'Filtro de aire']:
+        for i, nombre in enumerate(['Bujía', 'Filtro de aire'], start=1):
             self.client.post(reverse('productos:crear_producto'), {
+                'codigo': f'PROD-{i:04d}',
                 'nombre': nombre,
                 'precio': '5.00',
                 'stock_actual': '10',
@@ -121,6 +122,7 @@ class ProveedoresTests(TestCase):
         )
 
         self.client.post(reverse('productos:editar_producto', args=[producto.id]), {
+            'codigo': 'PROD-0001',
             'nombre': 'Bujía estándar',
             'precio': '3.50',
             'stock_actual': '10',

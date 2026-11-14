@@ -12,6 +12,14 @@
 <form method="post">
     {% csrf_token %}
 
+    <!-- Campo código -->
+    <div class="mb-3">
+        <label class="form-label">Código</label>
+        <input type="text" class="form-control {% if errores.codigo %}is-invalid{% endif %}"
+               name="codigo" value="{{ producto.codigo }}" placeholder="Ej: PROD-0001">
+        {% if errores.codigo %}<div class="invalid-feedback">{{ errores.codigo }}</div>{% endif %}
+    </div>
+
     <!-- Campo nombre -->
     <div class="mb-3">
         <label class="form-label">Nombre</label>
@@ -31,7 +39,7 @@
         <div class="col-md-4">
             <label class="form-label">Precio ($)</label>
             <input type="number" step="0.01" class="form-control {% if errores.precio %}is-invalid{% endif %}"
-                   name="precio" value="{{ producto.precio }}" required>
+                   name="precio" value="{{ producto.precio|stringformat:"0.2f" }}" required>
             {% if errores.precio %}<div class="invalid-feedback">{{ errores.precio }}</div>{% endif %}
         </div>
         <div class="col-md-4">

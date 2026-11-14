@@ -41,6 +41,20 @@ class PoliticaPasswordTests(TestCase):
         self.assertTrue(any('símbolo' in e for e in validar_password_segura('Abcdefg1')))
 
 
+class RegistroClienteTests(TestCase):
+    """HU003-CP006: un registro exitoso deja la sesión iniciada en Mis citas."""
+
+    def test_registro_inicia_sesion_y_redirige_a_mis_citas(self):
+        resp = self.client.post(reverse('usuarios:registro_cliente'), {
+            'dui': '01234567-8', 'nombre': 'Prueba', 'apellido': 'Cliente',
+            'telefono': '7000-0000', 'email': 'prueba.cliente1@example.com',
+            'direccion': 'San Salvador', 'contrasena': 'Taller#2026', 'confirmar': 'Taller#2026',
+        })
+
+        self.assertRedirects(resp, reverse('citas:mis_citas'))
+        self.assertEqual(str(self.client.session['_auth_user_id']), '01234567-8')
+
+
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class RecuperacionPasswordTests(TestCase):
     """Flujo completo de recuperación por correo."""

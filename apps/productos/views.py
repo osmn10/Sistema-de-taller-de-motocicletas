@@ -6,17 +6,20 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Producto, Proveedor
+
+# Formato fijo del código de producto: PROD- seguido de 4 dígitos (ej. PROD-0001)
+CODIGO_PRODUCTO_REGEX = re.compile(r'^PROD-\d{4}$')
 
 
 @login_required(login_url='usuarios:login')
 def inventario(request):
     """
     Lista todos los productos del inventario.
-    Permite buscar por nombre o proveedor.
+    Permite buscar por código, nombre o proveedor, y filtrar solo los de stock bajo.
     Muestra alerta si hay productos con stock bajo.
     """
     if not request.user.is_admin:
@@ -25,20 +28,25 @@ def inventario(request):
 
     # Obtener el término de búsqueda del parámetro GET (si existe)
     busqueda = request.GET.get('q', '').strip()
+    solo_stock_bajo = request.GET.get('stock_bajo') == '1'
 
     # Filtrar solo productos activos
     productos = Producto.objects.filter(activo=True).select_related('proveedor')
 
-    # Si hay búsqueda, filtrar por nombre o proveedor
+    # Si hay búsqueda, filtrar por código, nombre o proveedor
     if busqueda:
         productos = productos.filter(
             # __icontains busca texto sin importar mayúsculas/minúsculas
-            nombre__icontains=busqueda
-        ) | productos.filter(
-            proveedor__nombre__icontains=busqueda
+            Q(codigo__icontains=busqueda)
+            | Q(nombre__icontains=busqueda)
+            | Q(proveedor__nombre__icontains=busqueda)
         )
 
-    # Contar productos con stock bajo para mostrar alerta
+    # Filtro de stock bajo: compara stock_actual contra stock_minimo en la base de datos
+    if solo_stock_bajo:
+        productos = productos.filter(stock_actual__lt=F('stock_minimo'))
+
+    # Contar productos con stock bajo para mostrar alerta (sobre el listado ya filtrado)
     productos_stock_bajo = [p for p in productos if p.stock_bajo]
 
     # Obtener lista de proveedores activos para el formulario de crear producto
@@ -48,6 +56,7 @@ def inventario(request):
         'productos': productos,
         'proveedores': proveedores,
         'busqueda': busqueda,
+        'solo_stock_bajo': solo_stock_bajo,
         'productos_stock_bajo': productos_stock_bajo,
     })
 
@@ -64,6 +73,7 @@ def crear_producto(request):
 
     if request.method == 'POST':
         # Obtener datos del formulario
+        codigo = request.POST.get('codigo', '').strip()
         nombre = request.POST.get('nombre', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
         precio = request.POST.get('precio', '').strip()
@@ -75,6 +85,12 @@ def crear_producto(request):
         errores = {}
 
         # Validar campos obligatorios
+        if not codigo:
+            errores['codigo'] = 'El código es obligatorio.'
+        elif not CODIGO_PRODUCTO_REGEX.match(codigo):
+            errores['codigo'] = 'El código debe tener el formato PROD-0000.'
+        elif Producto.objects.filter(codigo__iexact=codigo).exists():
+            errores['codigo'] = 'Ya existe un producto con ese código.'
         if not nombre:
             errores['nombre'] = 'El nombre es obligatorio.'
         if not precio:
@@ -129,6 +145,7 @@ def crear_producto(request):
                 'errores': errores,
                 'productos_stock_bajo': productos_stock_bajo,
                 # Mantener los datos que el usuario escribió
+                'form_codigo': codigo,
                 'form_nombre': nombre,
                 'form_descripcion': descripcion,
                 'form_precio': precio,
@@ -138,6 +155,7 @@ def crear_producto(request):
 
         # Crear el producto en la base de datos
         Producto.objects.create(
+            codigo=codigo,
             nombre=nombre,
             descripcion=descripcion,
             precio=precio_decimal,
@@ -169,6 +187,7 @@ def editar_producto(request, producto_id):
 
     if request.method == 'POST':
         # Obtener datos del formulario
+        codigo = request.POST.get('codigo', '').strip()
         nombre = request.POST.get('nombre', '').strip()
         descripcion = request.POST.get('descripcion', '').strip()
         precio = request.POST.get('precio', '').strip()
@@ -180,6 +199,12 @@ def editar_producto(request, producto_id):
         errores = {}
 
         # Validar campos obligatorios
+        if not codigo:
+            errores['codigo'] = 'El código es obligatorio.'
+        elif not CODIGO_PRODUCTO_REGEX.match(codigo):
+            errores['codigo'] = 'El código debe tener el formato PROD-0000.'
+        elif Producto.objects.filter(codigo__iexact=codigo).exclude(id=producto.id).exists():
+            errores['codigo'] = 'Ya existe un producto con ese código.'
         if not nombre:
             errores['nombre'] = 'El nombre es obligatorio.'
         if not precio:
@@ -235,6 +260,7 @@ def editar_producto(request, producto_id):
             })
 
         # Actualizar los datos del producto
+        producto.codigo = codigo
         producto.nombre = nombre
         producto.descripcion = descripcion
         producto.precio = precio_decimal
