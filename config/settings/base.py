@@ -158,9 +158,10 @@ DEFAULT_FROM_EMAIL = config(
 )
 ANYMAIL = {'BREVO_API_KEY': config('BREVO_API_KEY', default='')}
 TALLER_NOMBRE = config('TALLER_NOMBRE', default='Sistema del Taller')
-TALLER_TELEFONO = config('TALLER_TELEFONO', default='')
-TALLER_DIRECCION = config('TALLER_DIRECCION', default='')
-TALLER_EMAIL_CONTACTO = config('TALLER_EMAIL_CONTACTO', default='')
+# HU031: datos de contacto que se muestran en el pie de los correos (ficticios por defecto)
+TALLER_TELEFONO = config('TALLER_TELEFONO', default='2660-0000')
+TALLER_DIRECCION = config('TALLER_DIRECCION', default='San Salvador, El Salvador')
+TALLER_EMAIL_CONTACTO = config('TALLER_EMAIL_CONTACTO', default='contacto@tallermotos.com')
 
 
 # ---------------------------------------------------------------------------
